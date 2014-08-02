@@ -50,6 +50,7 @@ INCLUDE_DIRECTORIES(  ${CHRONOENGINE_INCLUDES}  )
 
 SET(DEMOS ${DEMOS}
     demo_bricks
+    demo_ice1
     demo_excavator
 )
 
