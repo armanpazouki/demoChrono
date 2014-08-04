@@ -56,20 +56,23 @@ using namespace gui;
 
 
 const double rho = 1000;
-void add_hydronynamic_force(ChBodySceneNode* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& location) {
+
+void Calc_Hydrodynamics_Force(ChVector<> & force3, ChVector<> & forceLoc,
+		ChSharedPtr<ChBody> mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+
 	// ***** calculation of force
 	ChVector<> freeSurfaceNormal = -mphysicalSystem.Get_G_acc();
 	float g = freeSurfaceNormal.Length();
 	freeSurfaceNormal.Normalize();
 
-	ChVector<> bodyCtr = mrigidBody->GetBody()->GetPos();
-	ChVector<> dist3 = location - bodyCtr;
+	ChVector<> bodyCtr = mrigidBody->GetPos();
+	ChVector<> dist3 = freeSurfaceLocation - bodyCtr;
 	double dist = dist3.Dot(freeSurfaceNormal);
 
-	float rad = mrigidBody->GetBody()->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
+	float rad = mrigidBody->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
 
-	ChVector<> force3 = ChVector<>(0,0,0);
-	ChVector<> forceLoc = bodyCtr;
+	force3 = ChVector<>(0,0,0);
+	forceLoc = bodyCtr;
 	if (dist > rad) { //outside water
 		return;
 	} else if (dist < -rad) {
@@ -87,22 +90,24 @@ void add_hydronynamic_force(ChBodySceneNode* mrigidBody, ChSystem& mphysicalSyst
 																				// Mathematics and Computational Science. New York: Springer-Verlag, p. 107, 1998.)
 		forceLoc = distFromCenter * (-freeSurfaceNormal);
 	}
+}
+
+void update_hydronynamic_force(ChSharedPtr<ChBody> mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+	ChVector<> force3;
+	ChVector<> forceLoc;
+	Calc_Hydrodynamics_Force(force3, forceLoc, mrigidBody, mphysicalSystem, freeSurfaceLocation);
 	// ***** insertion of force
 	ChSharedPtr<ChForce> hydroForce;
-	hydroForce = mrigidBody->GetBody()->SearchForce("hydrodynamic");
+	hydroForce = mrigidBody->SearchForce("hydrodynamic");
 	if (hydroForce == NULL) {
-		mrigidBody->GetBody()->AddForce(hydroForce);
-		hydroForce = new ChForce;
+		mrigidBody->AddForce(hydroForce);
+		hydroForce = ChSharedPtr<ChForce>(new ChForce());
+		// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce);
 		hydroForce->SetName("hydrodynamic");
-		//(ChSharedPtr<ChForce>(hydroForce))->SetBody(mrigidBody->GetBody());
-		hydroForce->SetVrelpoint(forceLoc);
 	}
-
-
-
-
-
-
+	hydroForce->SetVrelpoint(forceLoc);
+	hydroForce->SetDir(force3.Normalize());
+	hydroForce->SetMforce(force3.Length());
 }
 
 void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
@@ -215,7 +220,7 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
 										&mphysicalSystem, msceneManager,
 										mmass, // mass
-										ChVector<>(0, 3, -8), // pos
+										ChVector<>(0, 10, -8), // pos
 										mradius, // radius
 										20,  // hslices, for rendering
 										15); // vslices, for rendering
@@ -231,6 +236,8 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	// Some aesthetics for 3d view..
 	mrigidBody->addShadowVolumeSceneNode();
 	mrigidBody->setMaterialTexture(0,	sphereMap);
+
+	update_hydronynamic_force(mrigidBody->GetBody(), mphysicalSystem, ChVector<>(0, 5, -8));
 
 }
 
@@ -300,10 +307,14 @@ int main(int argc, char* argv[])
 		application.DoStep();
  
 		application.GetVideoDriver()->endScene();  
-	}
-	 
- 
 
+		//************
+		ChSystem::IteratorBodies ibody = mphysicalSystem.IterBeginBodies();
+		while (ibody != mphysicalSystem.IterBeginBodies()) {
+			update_hydronynamic_force(*ibody, mphysicalSystem, ChVector<>(0, 5, -8));
+			ibody++;
+		}
+	}
 	return 0;
 }
   
