@@ -39,6 +39,7 @@
 #include "core/ChRealtimeStep.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
 #include "physics/ChMaterialSurface.h"
+#include <cstring>
 
  
 // Use the namespace of Chrono
@@ -57,8 +58,8 @@ using namespace gui;
 
 const double rho = 1000;
 
-void Calc_Hydrodynamics_Force(ChVector<> & force3, ChVector<> & forceLoc,
-		ChSharedPtr<ChBody> mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+void Calc_Hydrodynamics_Force(ChVector<float> & force3, ChVector<float> & forceLoc,
+		ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
 
 	// ***** calculation of force
 	ChVector<> freeSurfaceNormal = -mphysicalSystem.Get_G_acc();
@@ -90,24 +91,52 @@ void Calc_Hydrodynamics_Force(ChVector<> & force3, ChVector<> & forceLoc,
 																				// Mathematics and Computational Science. New York: Springer-Verlag, p. 107, 1998.)
 		forceLoc = distFromCenter * (-freeSurfaceNormal);
 	}
+	force3 = ChVector<>(0,0,0);
 }
 
-void update_hydronynamic_force(ChSharedPtr<ChBody> mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
-	ChVector<> force3;
-	ChVector<> forceLoc;
-	Calc_Hydrodynamics_Force(force3, forceLoc, mrigidBody, mphysicalSystem, freeSurfaceLocation);
+void add_hydronynamic_force(ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
 	// ***** insertion of force
 	ChSharedPtr<ChForce> hydroForce;
-	hydroForce = mrigidBody->SearchForce("hydrodynamic");
-	if (hydroForce == NULL) {
+//	std::string forceTag("hydrodynamics");
+	char forceTag[] = "hydrodynamics";
+	hydroForce = mrigidBody->SearchForce(forceTag);
+	if (hydroForce.IsNull()) {
+		printf("hydro create\n");
+
+		hydroForce = ChSharedPtr<ChForce>(new ChForce);
 		mrigidBody->AddForce(hydroForce);
-		hydroForce = ChSharedPtr<ChForce>(new ChForce());
-		// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce);
-		hydroForce->SetName("hydrodynamic");
+		// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce());
+		hydroForce->SetName(forceTag);
 	}
+	ChVector<float> force3;
+	ChVector<float> forceLoc;
+
+	Calc_Hydrodynamics_Force(force3, forceLoc, mrigidBody, mphysicalSystem, freeSurfaceLocation);
+
 	hydroForce->SetVrelpoint(forceLoc);
-	hydroForce->SetDir(force3.Normalize());
 	hydroForce->SetMforce(force3.Length());
+	force3.Normalize();
+	hydroForce->SetDir(force3);
+}
+
+void update_hydronynamic_force(ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+	// ***** insertion of force
+	ChSharedPtr<ChForce> hydroForce;
+//	std::string forceTag("hydrodynamics");
+	char forceTag[] = "hydrodynamics";
+	hydroForce = mrigidBody->SearchForce(forceTag);
+	if (!hydroForce.IsNull()) {
+		printf("hydro update\n");
+		ChVector<float> force3;
+		ChVector<float> forceLoc;
+		Calc_Hydrodynamics_Force(force3, forceLoc, mrigidBody, mphysicalSystem, freeSurfaceLocation);
+		force3 = ChVector<float>(0,0,0);
+
+		hydroForce->SetVrelpoint(forceLoc);
+		hydroForce->SetMforce(force3.Length());
+		force3.Normalize();
+		hydroForce->SetDir(force3);
+	}
 }
 
 void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
@@ -130,25 +159,25 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	video::ITexture* cubeMap   = driver->getTexture("../data/cubetexture_borders.png");
 	video::ITexture* sphereMap = driver->getTexture("../data/bluwhite.png");
 		
-
-	for (int ai = 0; ai < 1; ai++)  // N. of walls
-	{ 
-		for (int bi = 0; bi < 10; bi++)  // N. of vert. bricks
-		{ 
-			for (int ui = 0; ui < 15; ui++)  // N. of hor. bricks
-			{ 
-				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-													&mphysicalSystem, msceneManager,
-													0.8,
-													ChVector<>(-8+ui*4.0+2*(bi%2),  1.0+bi*2.0, ai*9),
-													ChQuaternion<>(1,0,0,0), 
-													ChVector<>(3.96,2,4) );
-				mrigidBody->GetBody()->SetMaterialSurface(mmaterial);
-				mrigidBody->setMaterialTexture(0,	cubeMap);
-				mrigidBody->addShadowVolumeSceneNode();
-			}
-		}
-	}
+// Arman: Blocks deactivated
+//	for (int ai = 0; ai < 1; ai++)  // N. of walls
+//	{
+//		for (int bi = 0; bi < 10; bi++)  // N. of vert. bricks
+//		{
+//			for (int ui = 0; ui < 15; ui++)  // N. of hor. bricks
+//			{
+//				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+//													&mphysicalSystem, msceneManager,
+//													0.8,
+//													ChVector<>(-8+ui*4.0+2*(bi%2),  1.0+bi*2.0, ai*9),
+//													ChQuaternion<>(1,0,0,0),
+//													ChVector<>(3.96,2,4) );
+//				mrigidBody->GetBody()->SetMaterialSurface(mmaterial);
+//				mrigidBody->setMaterialTexture(0,	cubeMap);
+//				mrigidBody->addShadowVolumeSceneNode();
+//			}
+//		}
+//	}
 
 
 	// Jenga tower
@@ -227,7 +256,7 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 
 	// set moment of inertia (more realistic than default 1,1,1).
 	mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
-	mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,16));
+	mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
 	mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
 	mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
@@ -237,7 +266,10 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	mrigidBody->addShadowVolumeSceneNode();
 	mrigidBody->setMaterialTexture(0,	sphereMap);
 
-	update_hydronynamic_force(mrigidBody->GetBody(), mphysicalSystem, ChVector<>(0, 5, -8));
+//	void add_hydronynamic_force(ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+
+
+//	add_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, ChVector<>(0, 5, -8));
 
 }
 
@@ -309,11 +341,19 @@ int main(int argc, char* argv[])
 		application.GetVideoDriver()->endScene();  
 
 		//************
-		ChSystem::IteratorBodies ibody = mphysicalSystem.IterBeginBodies();
-		while (ibody != mphysicalSystem.IterBeginBodies()) {
-			update_hydronynamic_force(*ibody, mphysicalSystem, ChVector<>(0, 5, -8));
-			ibody++;
-		}
+
+//		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
+//			update_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, ChVector<>(0, 5, -8));
+//
+//		}
+
+//		std::vector<ChBody*>::iterator ibody = mphysicalSystem.Get_bodylist()->begin();
+//		while (ibody != mphysicalSystem.Get_bodylist()->end()) {
+//			update_hydronynamic_force(*ibody, mphysicalSystem, ChVector<>(0, 5, -8));
+//			ibody++;
+////			printf("body pos %f %f %f\n", (*ibody)->coord.pos.x, (*ibody)->coord.pos.y, (*ibody)->coord.pos.z);
+//		}
+
 	}
 	return 0;
 }
