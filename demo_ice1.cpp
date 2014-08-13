@@ -301,7 +301,6 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 		// set moment of inertia (more realistic than default 1,1,1).
 		mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
 		mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
-		if (i==0) mrigidBody->GetBody()->SetPos_dt(ChVector<>(5,0,5));
 		mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 		mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
 		mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
