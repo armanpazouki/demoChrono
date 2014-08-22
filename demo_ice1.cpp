@@ -31,11 +31,11 @@
     
   
  
-#include "physics/ChApidll.h" 
+//#include "physics/ChApidll.h"
 #include "physics/ChSystem.h"
-#include "irrlicht_interface/ChBodySceneNode.h"
-#include "irrlicht_interface/ChBodySceneNodeTools.h" 
-#include "irrlicht_interface/ChIrrAppInterface.h"
+#include "unit_IRRLICHT/ChBodySceneNode.h"
+#include "unit_IRRLICHT/ChBodySceneNodeTools.h"
+#include "unit_IRRLICHT/ChIrrAppInterface.h"
 #include "core/ChRealtimeStep.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
 #include "physics/ChMaterialSurface.h"
@@ -324,7 +324,7 @@ int main(int argc, char* argv[])
 
 	// In CHRONO engine, The DLL_CreateGlobals() - DLL_DeleteGlobals(); pair is needed if
 	// global functions are needed.
-	DLL_CreateGlobals();
+//	DLL_CreateGlobals();
 
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
