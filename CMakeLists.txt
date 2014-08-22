@@ -49,10 +49,10 @@ INCLUDE_DIRECTORIES(  ${CHRONOENGINE_INCLUDES}  )
 
 
 SET(DEMOS ${DEMOS}
-    demo_bricks
+   # demo_bricks
     demo_ice1
-    demo_ice2
-    demo_excavator
+   # demo_ice2
+   # demo_excavator
 )
 
 FOREACH(PROGRAM ${DEMOS})
