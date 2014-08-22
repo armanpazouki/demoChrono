@@ -61,7 +61,7 @@ const double rhoR = 500;
 const double mu = 1;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
 
-void Calc_Hydrodynamics_Forces(ChVector<double> & F_Hydro, ChVector<double> & forceLoc, ChVector<double> & T_Drag,
+void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
 		ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
 
 	// ***** calculation of force
@@ -76,7 +76,7 @@ void Calc_Hydrodynamics_Forces(ChVector<double> & F_Hydro, ChVector<double> & fo
 	double rad = mrigidBody->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
 
 	//****************** Buoyancy Force
-	ChVector<double> F_Buoyancy = ChVector<>(0,0,0);
+	ChVector<> F_Buoyancy = ChVector<>(0,0,0);
 	forceLoc = bodyCtr;
 	if (dist < -rad) {
 		double V = 4.0 / 3 * CH_C_PI * pow(rad, 3);
@@ -95,8 +95,8 @@ void Calc_Hydrodynamics_Forces(ChVector<double> & F_Hydro, ChVector<double> & fo
 	// "dist > rad" --> outside of water
 	//****************** Drag Force and Torque
 	double Cd = 0.4;
-	ChVector<double> vel = mrigidBody->GetPos_dt();
-	ChVector<double> F_Drag = ChVector<>(0,0,0);
+	ChVector<> vel = mrigidBody->GetPos_dt();
+	ChVector<> F_Drag = ChVector<>(0,0,0);
 	if (dist < rad) {
 		double A_ref = 0.5 * CH_C_PI * rad * (rad - dist);
 		F_Drag = -6.0 * CH_C_PI * mu * rad * vel
@@ -137,9 +137,9 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystem& mphysicalSystem, co
 	}
 	//********** update force magnitude **********
 	if (!hydroForce.IsNull() || !hydroTorque.IsNull()) {
-		ChVector<double> F_Hydro;
-		ChVector<double> forceLoc;
-		ChVector<double> T_Drag;
+		ChVector<> F_Hydro;
+		ChVector<> forceLoc;
+		ChVector<> T_Drag;
 
 		Calc_Hydrodynamics_Forces(F_Hydro, forceLoc, T_Drag, mrigidBody, mphysicalSystem, freeSurfaceLocation);
 
@@ -174,27 +174,6 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	
 	video::ITexture* cubeMap   = driver->getTexture("../data/cubetexture_borders.png");
 	video::ITexture* sphereMap = driver->getTexture("../data/bluwhite.png");
-		
-// Arman: Blocks deactivated
-//	for (int ai = 0; ai < 1; ai++)  // N. of walls
-//	{
-//		for (int bi = 0; bi < 10; bi++)  // N. of vert. bricks
-//		{
-//			for (int ui = 0; ui < 15; ui++)  // N. of hor. bricks
-//			{
-//				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-//													&mphysicalSystem, msceneManager,
-//													rhoR * 31.68,
-//													ChVector<>(-8+ui*4.0+2*(bi%2),  1.0+bi*2.0, ai*9),
-//													ChQuaternion<>(1,0,0,0),
-//													ChVector<>(3.96,2,4) );
-//				mrigidBody->GetBody()->SetMaterialSurface(mmaterial);
-//				mrigidBody->setMaterialTexture(0,	cubeMap);
-//				mrigidBody->addShadowVolumeSceneNode();
-//			}
-//		}
-//	}
-
 
 	ChBodySceneNode* shipPtr;
 	double box_X = 15, box_Y = 2, box_Z = 20;
@@ -214,54 +193,13 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
 	shipPtr->setMaterialTexture(0,	cubeMap);
 	shipPtr->addShadowVolumeSceneNode();
-	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,15));
+//	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,15));
 
+	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
+	shipPtr->GetBody()->AddForce(shipForce);
+	shipForce->SetMforce(10000);
+	shipForce->SetDir(ChVector<>(0,0,1));
 
-	// Jenga tower
-	/*
-	for (int bi = 0; bi < 12; bi+=2) 
-	{ 
-		ChBodySceneNode* mrigidBody1;
-		mrigidBody1 = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR * 56,
-											ChVector<>(-5, 1.0+bi*2.0,  0),
-											ChQuaternion<>(1,0,0,0), 
-											ChVector<>(2,2, 14) );
-		mrigidBody1->GetBody()->SetMaterialSurface(mmaterial);
-		mrigidBody1->setMaterialTexture(0,	cubeMap);
-
-		ChBodySceneNode* mrigidBody2;
-		mrigidBody2 = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR * 56,
-											ChVector<>( 5, 1.0+bi*2.0,  0),
-											ChQuaternion<>(1,0,0,0), 
-											ChVector<>(2,2, 14) );
-		mrigidBody2->GetBody()->SetMaterialSurface(mmaterial);
-		mrigidBody2->setMaterialTexture(0,	cubeMap);
-
-		ChBodySceneNode* mrigidBody3;
-		mrigidBody3 = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR * 56,
-											ChVector<>(0, 3.0+bi*2.0,  5),
-											ChQuaternion<>(1,0,0,0), 
-											ChVector<>(14,2, 2) );
-		mrigidBody3->GetBody()->SetMaterialSurface(mmaterial);
-		mrigidBody3->setMaterialTexture(0,	cubeMap);
-
-		ChBodySceneNode* mrigidBody4;
-		mrigidBody4 = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR * 56,
-											ChVector<>(0, 3.0+bi*2.0,  -5),
-											ChQuaternion<>(1,0,0,0), 
-											ChVector<>(14,2, 2) );
-		mrigidBody4->GetBody()->SetMaterialSurface(mmaterial);
-		mrigidBody4->setMaterialTexture(0,	cubeMap);
-	}
-	*/
 
 	// Create the floor using
 	// fixed rigid body of 'box' type:
@@ -276,24 +214,68 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	earthPtr->GetBody()->SetBodyFixed(true);
 	earthPtr->GetBody()->SetMaterialSurface(mmaterial);
 
-	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
+//	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
+//	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
+//			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
+//			);
+	ChSharedPtr<ChLinkLockCylindrical> shipConstraint(new ChLinkLockCylindrical);
 	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
-			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
+			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
 			);
 	mphysicalSystem.AddLink(shipConstraint);
 
+	ChVector<> boxMin = ChVector<>(-4, 5, -12);
+	ChVector<> boxMax = ChVector<>(-4 + 80, 5, -12 + 110);
+	//**************** sphere prob
+	double mradius = 4;
+	int numColumns = (boxMax.x - boxMin.x - 2 * mradius) / (2 * mradius);
+	//**************** add walls
+	double wall_thickness = 1;
+	ChBodySceneNode* wallPtr;
+	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+											&mphysicalSystem, msceneManager,
+											rhoR,
+											ChVector<>(boxMin.x - wall_thickness/2, 0, 50),
+											ChQuaternion<>(1,0,0,0),
+											ChVector<>(wall_thickness,20,200) );
+	wallPtr->GetBody()->SetBodyFixed(true);
+	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
 
-	for (int i = 0; i < 100; i++) {
+	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+											&mphysicalSystem, msceneManager,
+											rhoR,
+											ChVector<>(boxMax.x + wall_thickness/2, 0, 50),
+											ChQuaternion<>(1,0,0,0),
+											ChVector<>(wall_thickness,20,200) );
+	wallPtr->GetBody()->SetBodyFixed(true);
+	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+
+	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+											&mphysicalSystem, msceneManager,
+											rhoR,
+											ChVector<>((boxMin.x + boxMax.x)/2, 0, boxMax.z + wall_thickness/2),
+											ChQuaternion<>(1,0,0,0),
+											ChVector<>(boxMax.x - boxMin.x, 20, wall_thickness) );
+	wallPtr->GetBody()->SetBodyFixed(true);
+	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+
+
+	int numSpheres = 100;
+	for (int i = 0; i < numSpheres; i++) {
 		// Create a ball that will collide with wall
-		double mradius = 4;
 		double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
 		GetLog() << "Ball mass = " << mmass << "\n";
 		double minert = (2./5.)* mmass * pow(mradius,2);
 
+		double spacing = 2 * mradius*1.1;
+
 		mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
 											&mphysicalSystem, msceneManager,
 											mmass, // mass
-											ChVector<>((i*10)%100 + 0, 9, 10*((i*10)/100)-8), // pos
+											ChVector<>(spacing * (i%numColumns), 0, spacing*(i/numColumns)) + (boxMin + ChVector<>(mradius,mradius,mradius)) , // pos
 											mradius, // radius
 											20,  // hslices, for rendering
 											15); // vslices, for rendering
@@ -313,11 +295,6 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 		create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
 	}
 }
-
-
- 
-
- 
  
 int main(int argc, char* argv[])
 { 
