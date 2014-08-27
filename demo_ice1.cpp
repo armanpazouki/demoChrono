@@ -39,12 +39,16 @@
 #include "core/ChRealtimeStep.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
 #include "physics/ChMaterialSurface.h"
+#include "collision/ChCModelBulletBody.h"
+#include "physics/ChContactContainer.h"
 #include <cstring>
+#include <map>
 
  
 // Use the namespace of Chrono
 
 using namespace chrono;
+using namespace collision;
 
 // Use the main namespaces of Irrlicht
 using namespace irr;
@@ -60,6 +64,11 @@ const double rhoF = 1000;
 const double rhoR = 500;
 const double mu = 1;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
+
+//******************* ship stuff
+ChBodySceneNode* shipPtr;
+const double shipVelocity = 1;
+//**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
 		ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
@@ -154,7 +163,44 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystem& mphysicalSystem, co
 	}
 }
 
-void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
+void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, ChVector<> & mTorque) {
+	ChContactContainer* container  = (ChContactContainer *) mphysicalSystem.GetContactContainer();
+//	std::map<ChBody*, ChVector<> > m_forces;
+//	std::map<ChBody*, ChVector<> > m_torques;
+//	ChVector<> mForce;
+//	ChVector<> mTorque;
+
+	std::list<ChContact*> m_list = container->GetContactList();
+	for (std::list<ChContact *>::iterator it=m_list.begin(); it != m_list.end(); ++it){
+	  ChVector<> force = (*it)->GetContactForce();
+	  ChModelBulletBody * model_A = (ChModelBulletBody *) (*it)->GetModelA();
+	  ChModelBulletBody * model_B = (ChModelBulletBody *) (*it)->GetModelB();
+//		  if ((model_A->GetBody() != shipPtr->GetBody()) && (model_B->GetBody() != shipPtr->GetBody())) {
+//			  continue;
+//		  }
+	  ChBody * body_A = model_A->GetBody();
+	  ChBody * body_B = model_B->GetBody();
+
+	  if (body_A == shipPtr->GetBody().get_ptr()) {
+		  mForce += force;
+
+		  ChVector<> point_on_A = (*it)->GetContactP1();
+		  mTorque += (point_on_A - body_A->GetPos()) % force;
+//		  ChVector<> local_point_on_A = ChTransform<>::TransformParentToLocal(point_on_A, body_A->GetPos(), body_A->GetRot());
+//		  mTorque += local_point_on_A % force;
+	  } else if (body_B == shipPtr->GetBody().get_ptr()) {
+		  mForce -= force;
+
+		  ChVector<> point_on_B = (*it)->GetContactP2();
+		  mTorque += (point_on_B - body_B->GetPos()) % force;
+//		  ChVector<> local_point_on_B = ChTransform<>::TransformParentToLocal(point_on_B, body_B->GetPos(), body_B->GetRot());
+//		  mTorque -= local_point_on_B % force;
+	  }
+	}
+}
+
+
+void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
 {
 
 	ChBodySceneNode* mrigidBody; 
@@ -175,9 +221,9 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	video::ITexture* cubeMap   = driver->getTexture("../data/cubetexture_borders.png");
 	video::ITexture* sphereMap = driver->getTexture("../data/bluwhite.png");
 
-	ChBodySceneNode* shipPtr;
 	double box_X = 15, box_Y = 2, box_Z = 20;
 	double boxMass = rhoR * box_X * box_Y * box_Z;
+	printf("box mass %f", boxMass);
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
 	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
 	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
@@ -193,12 +239,12 @@ void create_some_falling_items(ChSystem& mphysicalSystem, ISceneManager* msceneM
 	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
 	shipPtr->setMaterialTexture(0,	cubeMap);
 	shipPtr->addShadowVolumeSceneNode();
-//	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,15));
+	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
 
-	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
-	shipPtr->GetBody()->AddForce(shipForce);
-	shipForce->SetMforce(10000);
-	shipForce->SetDir(ChVector<>(0,0,1));
+//	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
+//	shipPtr->GetBody()->AddForce(shipForce);
+//	shipForce->SetMforce(10000);
+//	shipForce->SetDir(ChVector<>(0,0,1));
 
 
 	// Create the floor using
@@ -323,7 +369,7 @@ int main(int argc, char* argv[])
 
  
 	// Create all the rigid bodies.
-	create_some_falling_items(mphysicalSystem, application.GetSceneManager(), application.GetVideoDriver());
+	create_ice_particles(mphysicalSystem, application.GetSceneManager(), application.GetVideoDriver());
   
   
 	// Prepare the physical system for the simulation 
@@ -345,7 +391,7 @@ int main(int argc, char* argv[])
 	//
  
 	application.SetStepManage(true);
-	application.SetTimestep(0.04);
+	application.SetTimestep(0.01);
 //std::cout<<"reay to simulate"<<std::endl;
 	while(application.GetDevice()->run())
 	{
@@ -361,7 +407,17 @@ int main(int argc, char* argv[])
 //		std::cout<<"after step"<<std::endl;
 		application.GetVideoDriver()->endScene();
 
-		//************
+		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
+
+		//******************** ship force*********************
+//		ChVector<> shipForce = shipPtr->GetBody()->Get_Xforce();
+//		printf("force %f\n",shipForce.z);
+
+		ChVector<> mForce;
+		ChVector<> mTorque;
+		calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
+		printf("force %f %f %f\n", mForce.x, mForce.y, mForce.z);
+		//****************************************************
 
 //		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
 //			create_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, surfaceLoc, false);
