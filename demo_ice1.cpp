@@ -264,7 +264,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 //	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
 //			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
 //			);
-	ChSharedPtr<ChLinkLockCylindrical> shipConstraint(new ChLinkLockCylindrical);
+	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
 	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
 			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
 			);
@@ -352,16 +352,16 @@ int main(int argc, char* argv[])
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
 
-	// Create the Irrlicht visualization (open the Irrlicht device, 
+	// Create the Irrlicht visualization (open the Irrlicht device,
 	// bind a simple user interface, etc. etc.)
-	ChIrrAppInterface application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true); 
+	ChIrrAppInterface application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true);
 
- 
-	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
-	ChIrrWizard::add_typical_Logo  (application.GetDevice());
-	ChIrrWizard::add_typical_Sky   (application.GetDevice());
-	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(70.f, 120.f, -90.f), core::vector3df(30.f, 80.f, 60.f), 590,  400);
-	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-15,14,-30), core::vector3df(0,5,0)); 
+//  // *** Irrlicht stuff, deactivated
+//	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
+//	ChIrrWizard::add_typical_Logo  (application.GetDevice());
+//	ChIrrWizard::add_typical_Sky   (application.GetDevice());
+//	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(70.f, 120.f, -90.f), core::vector3df(30.f, 80.f, 60.f), 590,  400);
+//	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-15,14,-30), core::vector3df(0,5,0));
 
 	// 
 	// HERE YOU CREATE THE MECHANICAL SYSTEM OF CHRONO... 
@@ -391,21 +391,21 @@ int main(int argc, char* argv[])
 	//
  
 	application.SetStepManage(true);
-	application.SetTimestep(0.01);
+	application.SetTimestep(0.05);
 //std::cout<<"reay to simulate"<<std::endl;
 	while(application.GetDevice()->run())
 	{
-//		std::cout<<"before get"<<std::endl;
-		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
+////		std::cout<<"before get"<<std::endl;
+////		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
 
-		ChIrrTools::drawGrid(application.GetVideoDriver(), 5,5, 20,20, 
-			ChCoordsys<>(ChVector<>(0,0.2,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
-//		std::cout<<"before draw"<<std::endl;
-		application.DrawAll();
-//		std::cout<<"before step"<<std::endl;
+////		ChIrrTools::drawGrid(application.GetVideoDriver(), 5,5, 20,20,
+////			ChCoordsys<>(ChVector<>(0,0.2,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
+////		std::cout<<"before draw"<<std::endl;
+////		application.DrawAll();
+////		std::cout<<"before step"<<std::endl;
 		application.DoStep();
 //		std::cout<<"after step"<<std::endl;
-		application.GetVideoDriver()->endScene();
+////		application.GetVideoDriver()->endScene();
 
 		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
 
@@ -416,7 +416,7 @@ int main(int argc, char* argv[])
 		ChVector<> mForce;
 		ChVector<> mTorque;
 		calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
-		printf("force %f %f %f\n", mForce.x, mForce.y, mForce.z);
+		printf("time %f, force %f %f %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z);
 		//****************************************************
 
 //		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
