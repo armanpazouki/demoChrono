@@ -41,6 +41,7 @@
 #include "physics/ChMaterialSurface.h"
 #include "collision/ChCModelBulletBody.h"
 #include "physics/ChContactContainer.h"
+#include "core/ChTimer.h"
 #include <cstring>
 #include <map>
 
@@ -344,7 +345,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
  
 int main(int argc, char* argv[])
 { 
-
+	ChTimer<double> myTimer;
 	// In CHRONO engine, The DLL_CreateGlobals() - DLL_DeleteGlobals(); pair is needed if
 	// global functions are needed.
 //	DLL_CreateGlobals();
@@ -356,12 +357,14 @@ int main(int argc, char* argv[])
 	// bind a simple user interface, etc. etc.)
 	ChIrrAppInterface application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true);
 
-//  // *** Irrlicht stuff, deactivated
-//	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
-//	ChIrrWizard::add_typical_Logo  (application.GetDevice());
-//	ChIrrWizard::add_typical_Sky   (application.GetDevice());
-//	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(70.f, 120.f, -90.f), core::vector3df(30.f, 80.f, 60.f), 590,  400);
-//	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-15,14,-30), core::vector3df(0,5,0));
+// 1*********
+  // *** Irrlicht stuff, deactivated
+	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
+	ChIrrWizard::add_typical_Logo  (application.GetDevice());
+	ChIrrWizard::add_typical_Sky   (application.GetDevice());
+	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(70.f, 120.f, -90.f), core::vector3df(30.f, 80.f, 60.f), 590,  400);
+	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-15,14,-30), core::vector3df(0,5,0));
+// 2*********
 
 	// 
 	// HERE YOU CREATE THE MECHANICAL SYSTEM OF CHRONO... 
@@ -395,17 +398,21 @@ int main(int argc, char* argv[])
 //std::cout<<"reay to simulate"<<std::endl;
 	while(application.GetDevice()->run())
 	{
-////		std::cout<<"before get"<<std::endl;
-////		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
+		myTimer.start();
 
-////		ChIrrTools::drawGrid(application.GetVideoDriver(), 5,5, 20,20,
-////			ChCoordsys<>(ChVector<>(0,0.2,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
-////		std::cout<<"before draw"<<std::endl;
-////		application.DrawAll();
-////		std::cout<<"before step"<<std::endl;
+// 1********* irrlicht initialization 8888
+		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
+		ChIrrTools::drawGrid(application.GetVideoDriver(), 5,5, 20,20,
+			ChCoordsys<>(ChVector<>(0,0.2,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
+		application.DrawAll();
+// 2*********
 		application.DoStep();
 //		std::cout<<"after step"<<std::endl;
-////		application.GetVideoDriver()->endScene();
+
+// 1*********
+		application.GetVideoDriver()->endScene();
+// 2*********
+
 
 		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
 
@@ -416,19 +423,19 @@ int main(int argc, char* argv[])
 		ChVector<> mForce;
 		ChVector<> mTorque;
 		calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
-		printf("time %f, force %f %f %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z);
+
+		myTimer.stop();
+		printf("time %f, force %f %f %f, simulation time %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, myTimer());
 		//****************************************************
 
 //		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
 //			create_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, surfaceLoc, false);
 //
 //		}
-
 		std::vector<ChBody*>::iterator ibody = mphysicalSystem.Get_bodylist()->begin();
 		while (ibody != mphysicalSystem.Get_bodylist()->end()) {
 			create_hydronynamic_force(*ibody, mphysicalSystem, surfaceLoc, false);
 			ibody++;
-//			printf("body pos %f %f %f\n", (*ibody)->coord.pos.x, (*ibody)->coord.pos.y, (*ibody)->coord.pos.z);
 		}
 
 	}
