@@ -239,9 +239,6 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	//*****
 	ChVector<> boxMin = ChVector<>(-4, 5, -12);
 	ChVector<> boxMax = ChVector<>(-4 + 80, 5, -12 + 110);
-	//**************** sphere prob
-	double mradius = 4;
-	int numColumns = (boxMax.x - boxMin.x - 2 * mradius) / (2 * mradius);
 	//**************** add walls
 	//*** side wall 1
 	double wall_width = 60;
@@ -305,37 +302,44 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
 
 
+	//**************** sphere prob
+	double mradius = 2;
+	double spacing = 2 * mradius*1.1;
+	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
+	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
 
-	int numSpheres = 100;
-	for (int i = 0; i < numSpheres; i++) {
-		// Create a ball that will collide with wall
-		double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-		GetLog() << "Ball mass = " << mmass << "\n";
-		double minert = (2./5.)* mmass * pow(mradius,2);
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < numColX; i++) {
+			for (int k = 0; k < numColZ; k++) {
+				// Create a ball that will collide with wall
+				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
+				GetLog() << "Ball mass = " << mmass << "\n";
+				double minert = (2./5.)* mmass * pow(mradius,2);
 
-		double spacing = 2 * mradius*1.1;
+				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
+													&mphysicalSystem, msceneManager,
+													mmass, // mass
+													ChVector<>(i * spacing, j * spacing, k * spacing) + (boxMin + .5 * ChVector<>(spacing,spacing,spacing)) , // pos
+													mradius, // radius
+													20,  // hslices, for rendering
+													15); // vslices, for rendering
 
-		mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
-											&mphysicalSystem, msceneManager,
-											mmass, // mass
-											ChVector<>(spacing * (i%numColumns), 0, spacing*(i/numColumns)) + (boxMin + ChVector<>(mradius,mradius,mradius)) , // pos
-											mradius, // radius
-											20,  // hslices, for rendering
-											15); // vslices, for rendering
+				// set moment of inertia (more realistic than default 1,1,1).
+				mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
+				mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
+				mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+				mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
+				mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
+				mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
 
-		// set moment of inertia (more realistic than default 1,1,1).
-		mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
-		mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
-		mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-		mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
-		mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
-		mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+				// Some aesthetics for 3d view..
+				mrigidBody->addShadowVolumeSceneNode();
+				mrigidBody->setMaterialTexture(0,	sphereMap);
 
-		// Some aesthetics for 3d view..
-		mrigidBody->addShadowVolumeSceneNode();
-		mrigidBody->setMaterialTexture(0,	sphereMap);
+				create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
+			}
+		}
 
-		create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
 	}
 
 	//*** create ship
