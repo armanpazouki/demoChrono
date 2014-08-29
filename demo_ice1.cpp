@@ -222,69 +222,74 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	video::ITexture* cubeMap   = driver->getTexture("../data/cubetexture_borders.png");
 	video::ITexture* sphereMap = driver->getTexture("../data/bluwhite.png");
 
-	double box_X = 15, box_Y = 2, box_Z = 20;
-	double boxMass = rhoR * box_X * box_Y * box_Z;
-	printf("box mass %f", boxMass);
-	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
-	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
-	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
-
-	shipPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-										&mphysicalSystem, msceneManager,
-										boxMass,
-										ChVector<>(30,  9, -25),
-										ChQuaternion<>(1,0,0,0),
-										ChVector<>(box_X, box_Y, box_Z) );
-	shipPtr->GetBody()->SetMass(boxMass);
-	shipPtr->GetBody()->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
-	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
-	shipPtr->setMaterialTexture(0,	cubeMap);
-	shipPtr->addShadowVolumeSceneNode();
-	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
-
-//	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
-//	shipPtr->GetBody()->AddForce(shipForce);
-//	shipForce->SetMforce(10000);
-//	shipForce->SetDir(ChVector<>(0,0,1));
-
-
 	// Create the floor using
 	// fixed rigid body of 'box' type:
 
+	//*** create bed
 	ChBodySceneNode* earthPtr;
 	earthPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(0,-2,0),
+											ChVector<>(0,-40,0),
 											ChQuaternion<>(1,0,0,0), 
 											ChVector<>(550,4,550) );
 	earthPtr->GetBody()->SetBodyFixed(true);
 	earthPtr->GetBody()->SetMaterialSurface(mmaterial);
 
-//	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
-//	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
-//			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
-//			);
-	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
-	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
-			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
-			);
-	mphysicalSystem.AddLink(shipConstraint);
-
+	//*****
 	ChVector<> boxMin = ChVector<>(-4, 5, -12);
 	ChVector<> boxMax = ChVector<>(-4 + 80, 5, -12 + 110);
 	//**************** sphere prob
 	double mradius = 4;
 	int numColumns = (boxMax.x - boxMin.x - 2 * mradius) / (2 * mradius);
 	//**************** add walls
-	double wall_thickness = 1;
+	//*** side wall 1
+	double wall_width = 60;
+	double ship_height = 1;
+	double ship_width = 20;
+	double ship_length = 200;
 	ChBodySceneNode* wallPtr;
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(boxMin.x - wall_thickness/2, 0, 50),
+											ChVector<>(boxMin.x - ship_height/2, 0, 50),
 											ChQuaternion<>(1,0,0,0),
-											ChVector<>(wall_thickness,20,200) );
+											ChVector<>(ship_height,wall_width,ship_length) );
+	wallPtr->GetBody()->SetBodyFixed(true);
+	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+
+	//*** side wall 2
+	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+											&mphysicalSystem, msceneManager,
+											rhoR,
+											ChVector<>(boxMax.x + ship_height/2, 0, 50),
+											ChQuaternion<>(1,0,0,0),
+											ChVector<>(ship_height,wall_width,200) );
+	wallPtr->GetBody()->SetBodyFixed(true);
+	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+
+	//*** end wall
+	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+											&mphysicalSystem, msceneManager,
+											rhoR,
+											ChVector<>((boxMin.x + boxMax.x)/2, 0, boxMax.z),
+											ChQuaternion<>(1,0,0,0),
+											ChVector<>(boxMax.x - boxMin.x, wall_width, ship_height) );
+	wallPtr->GetBody()->SetBodyFixed(true);
+	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+
+	//*** beginning walls
+	double hole_width = 1.2 * ship_width;
+	double small_wall_Length = 0.5 * (boxMax.x - boxMin.x - hole_width);
+	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+											&mphysicalSystem, msceneManager,
+											rhoR,
+											ChVector<>(boxMin.x + .5 * small_wall_Length, 0, boxMin.z - ship_height/2),
+											ChQuaternion<>(1,0,0,0),
+											ChVector<>( small_wall_Length, wall_width, ship_height) );
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
@@ -292,22 +297,13 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(boxMax.x + wall_thickness/2, 0, 50),
+											ChVector<>(boxMax.x - .5 * small_wall_Length, 0, boxMin.z - ship_height/2),
 											ChQuaternion<>(1,0,0,0),
-											ChVector<>(wall_thickness,20,200) );
+											ChVector<>( small_wall_Length, wall_width, ship_height) );
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
 
-	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>((boxMin.x + boxMax.x)/2, 0, boxMax.z + wall_thickness/2),
-											ChQuaternion<>(1,0,0,0),
-											ChVector<>(boxMax.x - boxMin.x, 20, wall_thickness) );
-	wallPtr->GetBody()->SetBodyFixed(true);
-	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
 
 
 	int numSpheres = 100;
@@ -341,6 +337,44 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 
 		create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
 	}
+
+	//*** create ship
+	double box_X = 15, box_Y = 2, box_Z = ship_width;
+	double boxMass = rhoR * box_X * box_Y * box_Z;
+	printf("box mass %f", boxMass);
+	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
+	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
+	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
+
+	shipPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
+										&mphysicalSystem, msceneManager,
+										boxMass,
+										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, -25),
+										ChQuaternion<>(1,0,0,0),
+										ChVector<>(box_X, box_Y, box_Z) );
+	shipPtr->GetBody()->SetMass(boxMass);
+	shipPtr->GetBody()->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
+	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
+	shipPtr->setMaterialTexture(0,	cubeMap);
+	shipPtr->addShadowVolumeSceneNode();
+	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
+	shipPtr->GetBody()->SetRot(Q_from_AngAxis(CH_C_PI/2, VECT_X));
+
+//	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
+//	shipPtr->GetBody()->AddForce(shipForce);
+//	shipForce->SetMforce(10000);
+//	shipForce->SetDir(ChVector<>(0,0,1));
+
+	//***** prismatic constraint between ship and bed
+//	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
+//	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
+//			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
+//			);
+	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
+	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
+			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
+			);
+	mphysicalSystem.AddLink(shipConstraint);
 }
  
 int main(int argc, char* argv[])
