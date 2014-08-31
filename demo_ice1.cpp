@@ -39,6 +39,7 @@
 #include "core/ChRealtimeStep.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
 #include "physics/ChMaterialSurface.h"
+#include "physics/ChController.h"
 #include "collision/ChCModelBulletBody.h"
 #include "physics/ChContactContainer.h"
 #include "core/ChTimer.h"
@@ -69,6 +70,7 @@ const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
 //******************* ship stuff
 ChBodySceneNode* shipPtr;
 const double shipVelocity = 1;
+double pauseTimer = 1;
 //**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
@@ -109,8 +111,14 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	ChVector<> F_Drag = ChVector<>(0,0,0);
 	if (dist < rad) {
 		double A_ref = 0.5 * CH_C_PI * rad * (rad - dist);
-		F_Drag = -6.0 * CH_C_PI * mu * rad * vel
-					-0.5 * rhoF * Cd * vel.Length() * vel;
+		double multDrag = 1;
+		if (mphysicalSystem.GetChTime() < pauseTimer) {
+			multDrag = 1000;
+		} else {
+			multDrag = 1;
+		}
+		F_Drag = multDrag * (-6.0 * CH_C_PI * mu * rad * vel
+					-0.5 * rhoF * Cd * vel.Length() * vel);
 		T_Drag = -8.0 * CH_C_PI * mu * pow(rad, 3) * mrigidBody->GetWvel_par(); // in parent, i.e. absoute, reference frame.
 	}
 	//****************** Total Force
@@ -204,8 +212,7 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
 {
 
-	ChBodySceneNode* mrigidBody; 
-
+	ChBodySceneNode* mrigidBody;
 	ChSharedPtr<ChMaterialSurface> mmaterial(new ChMaterialSurface);
 	mmaterial->SetFriction(0.4f);
 
@@ -303,7 +310,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 
 
 	//**************** sphere prob
-	double mradius = 2;
+	double mradius = 5;
 	double spacing = 2 * mradius*1.1;
 	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
 	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
@@ -353,7 +360,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	shipPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 										&mphysicalSystem, msceneManager,
 										boxMass,
-										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, -25),
+										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, boxMin.z - box_Y),
 										ChQuaternion<>(1,0,0,0),
 										ChVector<>(box_X, box_Y, box_Z) );
 	shipPtr->GetBody()->SetMass(boxMass);
@@ -361,8 +368,17 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
 	shipPtr->setMaterialTexture(0,	cubeMap);
 	shipPtr->addShadowVolumeSceneNode();
-	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
+	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,0));
 	shipPtr->GetBody()->SetRot(Q_from_AngAxis(CH_C_PI/2, VECT_X));
+	char forceTag[] = "pulling_force";
+	ChSharedPtr<ChForce> pullingForce = ChSharedPtr<ChForce>(new ChForce);
+	pullingForce->SetMode(FTYPE_FORCE); // no need for this. It is the default option.
+	shipPtr->GetBody()->AddForce(pullingForce);
+	// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce());
+	pullingForce->SetName(forceTag);
+	pullingForce->SetVpoint(shipPtr->GetBody()->GetPos());
+	pullingForce->SetMforce(0);
+	pullingForce->SetDir(ChVector<>(1,0,0));
 
 //	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
 //	shipPtr->GetBody()->AddForce(shipForce);
@@ -379,6 +395,20 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
 			);
 	mphysicalSystem.AddLink(shipConstraint);
+}
+
+void MoveShip(ChSystem& mphysicalSystem) {
+    ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
+    my_controllerPID->P = 1.0e6;
+    my_controllerPID->D = 1.0e6;
+    my_controllerPID->I = 1.0e6;
+
+    double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos_dt().x - shipVelocity, mphysicalSystem.GetChTime());
+    printf("forcePID %f\n", forcePID_X);
+    char forceTag[] = "pulling_force";
+	ChSharedPtr<ChForce> pullingForce = shipPtr->GetBody()->SearchForce(forceTag);
+	pullingForce->SetMforce(forcePID_X);
+	pullingForce->SetDir(ChVector<>(1,0,0));
 }
  
 int main(int argc, char* argv[])
@@ -434,6 +464,7 @@ int main(int argc, char* argv[])
 	application.SetStepManage(true);
 	application.SetTimestep(0.05);
 //std::cout<<"reay to simulate"<<std::endl;
+
 	while(application.GetDevice()->run())
 	{
 		myTimer.start();
@@ -450,10 +481,10 @@ int main(int argc, char* argv[])
 // 1*********
 		application.GetVideoDriver()->endScene();
 // 2*********
-
-
-		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
-
+//		if (mphysicalSystem.GetChTime() > pauseTimer) {
+			MoveShip(mphysicalSystem);
+			//shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
+//		}
 		//******************** ship force*********************
 //		ChVector<> shipForce = shipPtr->GetBody()->Get_Xforce();
 //		printf("force %f\n",shipForce.z);
