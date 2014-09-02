@@ -44,6 +44,7 @@
 #include "physics/ChContactContainer.h"
 #include "core/ChTimer.h"
 #include <cstring>
+#include <fstream>
 #include <map>
 
  
@@ -69,8 +70,9 @@ const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
 
 //******************* ship stuff
 ChBodySceneNode* shipPtr;
-const double shipVelocity = 1;
-double pauseTimer = 1;
+const double shipVelocity = .27;//1;
+double shipInitialPosZ = 0;
+const double pauseTimer = 1;
 //**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
@@ -310,17 +312,17 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 
 
 	//**************** sphere prob
-	double mradius = 5;
+	// note: dimensions are in cm
+	double mradius = 2;
 	double spacing = 2 * mradius*1.1;
 	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
 	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
 
-	for (int j = 0; j < 3; j++) {
+	for (int j = 0; j < 5; j++) {
 		for (int i = 0; i < numColX; i++) {
 			for (int k = 0; k < numColZ; k++) {
 				// Create a ball that will collide with wall
 				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-				GetLog() << "Ball mass = " << mmass << "\n";
 				double minert = (2./5.)* mmass * pow(mradius,2);
 
 				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
@@ -350,17 +352,17 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	}
 
 	//*** create ship
-	double box_X = 15, box_Y = 2, box_Z = ship_width;
+	double box_X = ship_width, box_Y = 40, box_Z = 2;
 	double boxMass = rhoR * box_X * box_Y * box_Z;
-	printf("box mass %f", boxMass);
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
 	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
 	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
 
+	shipInitialPosZ = boxMin.z - box_Z;
 	shipPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 										&mphysicalSystem, msceneManager,
 										boxMass,
-										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, boxMin.z - box_Y),
+										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, shipInitialPosZ),
 										ChQuaternion<>(1,0,0,0),
 										ChVector<>(box_X, box_Y, box_Z) );
 	shipPtr->GetBody()->SetMass(boxMass);
@@ -369,7 +371,6 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	shipPtr->setMaterialTexture(0,	cubeMap);
 	shipPtr->addShadowVolumeSceneNode();
 	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,0));
-	shipPtr->GetBody()->SetRot(Q_from_AngAxis(CH_C_PI/2, VECT_X));
 	char forceTag[] = "pulling_force";
 	ChSharedPtr<ChForce> pullingForce = ChSharedPtr<ChForce>(new ChForce);
 	pullingForce->SetMode(FTYPE_FORCE); // no need for this. It is the default option.
@@ -398,17 +399,21 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 }
 
 void MoveShip(ChSystem& mphysicalSystem) {
+	static bool onCall = false;
+	if (!onCall) {
+		onCall = true;
+		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
+	}
     ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
-    my_controllerPID->P = 1.0e6;
-    my_controllerPID->D = 1.0e6;
-    my_controllerPID->I = 1.0e6;
+    my_controllerPID->P = 1.0e9;
+    my_controllerPID->D = 1.0e8;
+    my_controllerPID->I = 1.0e8;
 
-    double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos_dt().x - shipVelocity, mphysicalSystem.GetChTime());
-    printf("forcePID %f\n", forcePID_X);
+    double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos().z - shipInitialPosZ - shipVelocity * (mphysicalSystem.GetChTime() - pauseTimer), mphysicalSystem.GetChTime());
     char forceTag[] = "pulling_force";
 	ChSharedPtr<ChForce> pullingForce = shipPtr->GetBody()->SearchForce(forceTag);
 	pullingForce->SetMforce(forcePID_X);
-	pullingForce->SetDir(ChVector<>(1,0,0));
+	pullingForce->SetDir(ChVector<>(0,0,-1));
 }
  
 int main(int argc, char* argv[])
@@ -446,11 +451,9 @@ int main(int argc, char* argv[])
 	// Prepare the physical system for the simulation 
 
 	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_SOR);
-
 	mphysicalSystem.SetUseSleeping(false);
-
 	mphysicalSystem.SetMaxPenetrationRecoverySpeed(1); // used by Anitescu stepper only
-	mphysicalSystem.SetIterLCPmaxItersSpeed(50);
+	mphysicalSystem.SetIterLCPmaxItersSpeed(500);
 	//mphysicalSystem.SetIterLCPmaxItersStab(20); // unuseful for Anitescu, only Tasora uses this
 	//mphysicalSystem.SetIterLCPwarmStarting(true);
 	//mphysicalSystem.SetParallelThreadNumber(2);
@@ -462,13 +465,12 @@ int main(int argc, char* argv[])
 	//
  
 	application.SetStepManage(true);
-	application.SetTimestep(0.05);
+	application.SetTimestep(.025);
 //std::cout<<"reay to simulate"<<std::endl;
 
 	while(application.GetDevice()->run())
 	{
 		myTimer.start();
-
 // 1********* irrlicht initialization 8888
 		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
 		ChIrrTools::drawGrid(application.GetVideoDriver(), 5,5, 20,20,
@@ -481,10 +483,10 @@ int main(int argc, char* argv[])
 // 1*********
 		application.GetVideoDriver()->endScene();
 // 2*********
-//		if (mphysicalSystem.GetChTime() > pauseTimer) {
+		if (mphysicalSystem.GetChTime() > pauseTimer) {
 			MoveShip(mphysicalSystem);
 			//shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
-//		}
+		}
 		//******************** ship force*********************
 //		ChVector<> shipForce = shipPtr->GetBody()->Get_Xforce();
 //		printf("force %f\n",shipForce.z);
@@ -494,18 +496,20 @@ int main(int argc, char* argv[])
 		calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
 
 		myTimer.stop();
-		printf("time %f, force %f %f %f, simulation time %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, myTimer());
 		//****************************************************
-
 //		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
 //			create_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, surfaceLoc, false);
 //
 //		}
 		std::vector<ChBody*>::iterator ibody = mphysicalSystem.Get_bodylist()->begin();
+		double energy = 0;
 		while (ibody != mphysicalSystem.Get_bodylist()->end()) {
 			create_hydronynamic_force(*ibody, mphysicalSystem, surfaceLoc, false);
+			energy += pow((*ibody)->GetPos_dt().Length() , 2);
 			ibody++;
 		}
+		printf("time %f, force %f %f %f, shipVelocity %f, simulation time %f, energy %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, shipPtr->GetBody()->GetPos_dt().z, myTimer(), energy);
+
 
 	}
 	return 0;
