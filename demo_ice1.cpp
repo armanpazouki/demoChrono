@@ -61,6 +61,7 @@ using namespace scene;
 using namespace video;
 using namespace io;
 using namespace gui;
+using namespace std;
 
 
 
@@ -73,11 +74,15 @@ const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
 ChBodySceneNode* shipPtr;
 const double shipVelocity = .27;//1;
 double shipInitialPosZ = 0;
-const double pauseTimer = 1;
+const double timePause = 1;
 //**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
 		ChBody* mrigidBody, ChSystem& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+	F_Hydro = ChVector<>(0,0,0);
+	forceLoc = ChVector<>(0,0,0);
+	T_Drag = ChVector<>(0,0,0);
+
 
 	// ***** calculation of force
 	ChVector<> freeSurfaceNormal = -mphysicalSystem.Get_G_acc();
@@ -115,7 +120,7 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	if (dist < rad) {
 		double A_ref = 0.5 * CH_C_PI * rad * (rad - dist);
 		double multDrag = 1;
-		if (mphysicalSystem.GetChTime() < pauseTimer) {
+		if (mphysicalSystem.GetChTime() < timePause) {
 			multDrag = 1000;
 		} else {
 			multDrag = 1;
@@ -176,6 +181,8 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystem& mphysicalSystem, co
 }
 
 void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, ChVector<> & mTorque) {
+	mForce = ChVector<>(0,0,0);
+	mTorque = ChVector<>(0,0,0);
 	ChContactContainer* container  = (ChContactContainer *) mphysicalSystem.GetContactContainer();
 //	std::map<ChBody*, ChVector<> > m_forces;
 //	std::map<ChBody*, ChVector<> > m_torques;
@@ -183,8 +190,10 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 //	ChVector<> mTorque;
 
 	std::list<ChContact*> m_list = container->GetContactList();
+	printf("size list %d\n", m_list.size());
 	for (std::list<ChContact *>::iterator it=m_list.begin(); it != m_list.end(); ++it){
 	  ChVector<> force = (*it)->GetContactForce();
+	  printf("force x y z %f %f %f\n", force.x, force.y, force.z);
 	  ChModelBulletBody * model_A = (ChModelBulletBody *) (*it)->GetModelA();
 	  ChModelBulletBody * model_B = (ChModelBulletBody *) (*it)->GetModelB();
 //		  if ((model_A->GetBody() != shipPtr->GetBody()) && (model_B->GetBody() != shipPtr->GetBody())) {
@@ -319,38 +328,38 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
 	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
 
-	for (int j = 0; j < 5; j++) {
-		for (int i = 0; i < numColX; i++) {
-			for (int k = 0; k < numColZ; k++) {
-				// Create a ball that will collide with wall
-				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-				double minert = (2./5.)* mmass * pow(mradius,2);
-
-				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
-													&mphysicalSystem, msceneManager,
-													mmass, // mass
-													ChVector<>(i * spacing, j * spacing, k * spacing) + (boxMin + .5 * ChVector<>(spacing,spacing,spacing)) , // pos
-													mradius, // radius
-													20,  // hslices, for rendering
-													15); // vslices, for rendering
-
-				// set moment of inertia (more realistic than default 1,1,1).
-				mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
-				mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
-				mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-				mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
-				mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
-				mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-
-				// Some aesthetics for 3d view..
-				mrigidBody->addShadowVolumeSceneNode();
-				mrigidBody->setMaterialTexture(0,	sphereMap);
-
-				create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
-			}
-		}
-
-	}
+//	for (int j = 0; j < 5; j++) {
+//		for (int i = 0; i < numColX; i++) {
+//			for (int k = 0; k < numColZ; k++) {
+//				// Create a ball that will collide with wall
+//				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
+//				double minert = (2./5.)* mmass * pow(mradius,2);
+//
+//				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
+//													&mphysicalSystem, msceneManager,
+//													mmass, // mass
+//													ChVector<>(i * spacing, j * spacing, k * spacing) + (boxMin + .5 * ChVector<>(spacing,spacing,spacing)) , // pos
+//													mradius, // radius
+//													20,  // hslices, for rendering
+//													15); // vslices, for rendering
+//
+//				// set moment of inertia (more realistic than default 1,1,1).
+//				mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
+//				mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
+//				mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+//				mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
+//				mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
+//				mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+//
+//				// Some aesthetics for 3d view..
+//				mrigidBody->addShadowVolumeSceneNode();
+//				mrigidBody->setMaterialTexture(0,	sphereMap);
+//
+//				create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
+//			}
+//		}
+//
+//	}
 
 	//*** create ship
 	double box_X = ship_width, box_Y = 40, box_Z = 2;
@@ -397,24 +406,60 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
 			);
 	mphysicalSystem.AddLink(shipConstraint);
+
+
+
+
+
+
+
+
+
+
+
+
+
+	// *** dummy
+	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
+	double minert = (2./5.)* mmass * pow(mradius,2);
+	mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
+										&mphysicalSystem, msceneManager,
+										mmass, // mass
+										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, shipInitialPosZ + 2 * mradius),
+										mradius, // radius
+										20,  // hslices, for rendering
+										15); // vslices, for rendering
+
+	// set moment of inertia (more realistic than default 1,1,1).
+	mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
+	mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,-10));
+	mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+	mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
+	mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
+	mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+	// Some aesthetics for 3d view..
+	mrigidBody->addShadowVolumeSceneNode();
+	mrigidBody->setMaterialTexture(0,	sphereMap);
+	create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
+	// *** end of dummy
 }
 
 void MoveShip(ChSystem& mphysicalSystem) {
 	static bool onCall = false;
-	if (!onCall) {
-		onCall = true;
+//	if (!onCall) {
+//		onCall = true;
 		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
-	}
-    ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
-    my_controllerPID->P = 1.0e9;
-    my_controllerPID->D = 1.0e8;
-    my_controllerPID->I = 1.0e8;
-
-    double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos().z - shipInitialPosZ - shipVelocity * (mphysicalSystem.GetChTime() - pauseTimer), mphysicalSystem.GetChTime());
-    char forceTag[] = "pulling_force";
-	ChSharedPtr<ChForce> pullingForce = shipPtr->GetBody()->SearchForce(forceTag);
-	pullingForce->SetMforce(forcePID_X);
-	pullingForce->SetDir(ChVector<>(0,0,-1));
+//	}
+//    ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
+//    my_controllerPID->P = 1.0e9;
+//    my_controllerPID->D = 1.0e8;
+//    my_controllerPID->I = 1.0e8;
+//
+//    double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos().z - shipInitialPosZ - shipVelocity * (mphysicalSystem.GetChTime() - timePause), mphysicalSystem.GetChTime());
+//    char forceTag[] = "pulling_force";
+//	ChSharedPtr<ChForce> pullingForce = shipPtr->GetBody()->SearchForce(forceTag);
+//	pullingForce->SetMforce(forcePID_X);
+//	pullingForce->SetDir(ChVector<>(0,0,-1));
 }
  
 int main(int argc, char* argv[])
@@ -430,7 +475,7 @@ int main(int argc, char* argv[])
 	// Create the Irrlicht visualization (open the Irrlicht device,
 	// bind a simple user interface, etc. etc.)
 	ChIrrAppInterface application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true);
-
+	fstream outForceData("forceData.txt", ios::out);
 // 1*********
   // *** Irrlicht stuff, deactivated
 	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
@@ -466,9 +511,11 @@ int main(int argc, char* argv[])
 	//
  
 	application.SetStepManage(true);
-	application.SetTimestep(.025);
+	application.SetTimestep(.01);
 //std::cout<<"reay to simulate"<<std::endl;
 
+	outForceData << "time, forceX, forceY, forceZ, forceMag, shipVelocity, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 	while(application.GetDevice()->run())
 	{
 		myTimer.start();
@@ -484,7 +531,7 @@ int main(int argc, char* argv[])
 // 1*********
 		application.GetVideoDriver()->endScene();
 // 2*********
-		if (mphysicalSystem.GetChTime() > pauseTimer) {
+		if (mphysicalSystem.GetChTime() > timePause) {
 			MoveShip(mphysicalSystem);
 			//shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
 		}
@@ -510,9 +557,12 @@ int main(int argc, char* argv[])
 			ibody++;
 		}
 		printf("time %f, force %f %f %f, shipVelocity %f, simulation time %f, energy %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, shipPtr->GetBody()->GetPos_dt().z, myTimer(), energy);
+		outForceData << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
+				mForce.Length() << ", " << shipPtr->GetBody()->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
 
 
 	}
+	outForceData.close();
 	return 0;
 }
   
