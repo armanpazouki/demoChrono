@@ -192,8 +192,10 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 	std::list<ChContact*> m_list = container->GetContactList();
 	printf("size list %d\n", m_list.size());
 	for (std::list<ChContact *>::iterator it=m_list.begin(); it != m_list.end(); ++it){
-	  ChVector<> force = (*it)->GetContactForce();
-	  printf("force x y z %f %f %f\n", force.x, force.y, force.z);
+	  ChVector<> force_contactFrame = (*it)->GetContactForce();
+	  ChVector<> force_abs = *((*it)->GetContactPlane()) * force_contactFrame;
+
+	  printf("force_contactFrame x y z %f %f %f\n", force_contactFrame.x, force_contactFrame.y, force_contactFrame.z);
 	  ChModelBulletBody * model_A = (ChModelBulletBody *) (*it)->GetModelA();
 	  ChModelBulletBody * model_B = (ChModelBulletBody *) (*it)->GetModelB();
 //		  if ((model_A->GetBody() != shipPtr->GetBody()) && (model_B->GetBody() != shipPtr->GetBody())) {
@@ -203,17 +205,17 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 	  ChBody * body_B = model_B->GetBody();
 
 	  if (body_A == shipPtr->GetBody().get_ptr()) {
-		  mForce += force;
+		  mForce -= force_abs;
 
 		  ChVector<> point_on_A = (*it)->GetContactP1();
-		  mTorque += (point_on_A - body_A->GetPos()) % force;
+		  mTorque -= (point_on_A - body_A->GetPos()) % force_abs;
 //		  ChVector<> local_point_on_A = ChTransform<>::TransformParentToLocal(point_on_A, body_A->GetPos(), body_A->GetRot());
 //		  mTorque += local_point_on_A % force;
 	  } else if (body_B == shipPtr->GetBody().get_ptr()) {
-		  mForce -= force;
+		  mForce += force_abs;
 
 		  ChVector<> point_on_B = (*it)->GetContactP2();
-		  mTorque += (point_on_B - body_B->GetPos()) % force;
+		  mTorque += (point_on_B - body_B->GetPos()) % force_abs;
 //		  ChVector<> local_point_on_B = ChTransform<>::TransformParentToLocal(point_on_B, body_B->GetPos(), body_B->GetRot());
 //		  mTorque -= local_point_on_B % force;
 	  }
