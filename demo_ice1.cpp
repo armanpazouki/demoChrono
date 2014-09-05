@@ -66,15 +66,20 @@ using namespace std;
 
 
 const double rhoF = 1000;
-const double rhoR = 500;
+const double rhoR = 917;
 const double mu_Viscosity = 1;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
 
-//******************* ship stuff
+//******************* ship and sphere stuff
+double mradius = .02;
+int numLayers = 3;
+
 ChBodySceneNode* shipPtr;
-const double shipVelocity = .27;//1;
+const double shipVelocity = 0;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
-const double timePause = 10;
+const double timePause = 10; //arman modify
+double ship_width = .20;
+double box_X = ship_width, box_Y = .40, box_Z = .02;
 //**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
@@ -190,12 +195,9 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 //	ChVector<> mTorque;
 
 	std::list<ChContact*> m_list = container->GetContactList();
-	printf("size list %d\n", m_list.size());
 	for (std::list<ChContact *>::iterator it=m_list.begin(); it != m_list.end(); ++it){
 	  ChVector<> force_contactFrame = (*it)->GetContactForce();
 	  ChVector<> force_abs = *((*it)->GetContactPlane()) * force_contactFrame;
-
-	  printf("force_contactFrame x y z %f %f %f\n", force_contactFrame.x, force_contactFrame.y, force_contactFrame.z);
 	  ChModelBulletBody * model_A = (ChModelBulletBody *) (*it)->GetModelA();
 	  ChModelBulletBody * model_B = (ChModelBulletBody *) (*it)->GetModelB();
 //		  if ((model_A->GetBody() != shipPtr->GetBody()) && (model_B->GetBody() != shipPtr->GetBody())) {
@@ -251,26 +253,25 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	earthPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(0,-40,0),
+											ChVector<>(0,-.40,0),
 											ChQuaternion<>(1,0,0,0), 
-											ChVector<>(550,4,550) );
+											ChVector<>(5.50,.04,5.50) );
 	earthPtr->GetBody()->SetBodyFixed(true);
 	earthPtr->GetBody()->SetMaterialSurface(mmaterial);
 
 	//*****
-	ChVector<> boxMin = ChVector<>(-4, 5, -12);
-	ChVector<> boxMax = ChVector<>(-4 + 80, 5, -12 + 110);
+	ChVector<> boxMin = ChVector<>(-.04, .05, -.12);
+	ChVector<> boxMax = ChVector<>(-.04 + .80, .05, -.12 + 1.10);
 	//**************** add walls
 	//*** side wall 1
-	double wall_width = 60;
-	double ship_height = 1;
-	double ship_width = 20;
-	double ship_length = 200;
+	double wall_width = .60;
+	double ship_height = .01;
+	double ship_length = 2.00;
 	ChBodySceneNode* wallPtr;
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(boxMin.x - ship_height/2, 0, 50),
+											ChVector<>(boxMin.x - ship_height/2, 0, .50),
 											ChQuaternion<>(1,0,0,0),
 											ChVector<>(ship_height,wall_width,ship_length) );
 	wallPtr->GetBody()->SetBodyFixed(true);
@@ -281,9 +282,9 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(boxMax.x + ship_height/2, 0, 50),
+											ChVector<>(boxMax.x + ship_height/2, 0, .50),
 											ChQuaternion<>(1,0,0,0),
-											ChVector<>(ship_height,wall_width,200) );
+											ChVector<>(ship_height,wall_width,2.00) );
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
@@ -325,12 +326,11 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 
 	//**************** sphere prob
 	// note: dimensions are in cm
-	double mradius = 2;
 	double spacing = 2 * mradius*1.1;
 	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
 	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
 
-	for (int j = 0; j < 5; j++) {
+	for (int j = 0; j < numLayers; j++) {
 		for (int i = 0; i < numColX; i++) {
 			for (int k = 0; k < numColZ; k++) {
 				// Create a ball that will collide with wall
@@ -364,7 +364,6 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	}
 
 	//*** create ship
-	double box_X = ship_width, box_Y = 40, box_Z = 2;
 	double boxMass = rhoR * box_X * box_Y * box_Z;
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
 	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
@@ -374,7 +373,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	shipPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 										&mphysicalSystem, msceneManager,
 										boxMass,
-										ChVector<>(.5 * (boxMax.x + boxMin.x),  9, shipInitialPosZ),
+										ChVector<>(.5 * (boxMax.x + boxMin.x),  .09, shipInitialPosZ),
 										ChQuaternion<>(1,0,0,0),
 										ChVector<>(box_X, box_Y, box_Z) );
 	shipPtr->GetBody()->SetMass(boxMass);
@@ -405,7 +404,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 //			);
 	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
 	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
-			ChCoordsys<>(ChVector<>(30,  9, -25) , QUNIT)
+			ChCoordsys<>(ChVector<>(.30,  .09, -.25) , QUNIT)
 			);
 	mphysicalSystem.AddLink(shipConstraint);
 }
@@ -447,8 +446,8 @@ int main(int argc, char* argv[])
 	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
 	ChIrrWizard::add_typical_Logo  (application.GetDevice());
 	ChIrrWizard::add_typical_Sky   (application.GetDevice());
-	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(70.f, 120.f, -90.f), core::vector3df(30.f, 80.f, 60.f), 590,  400);
-	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-15,14,-30), core::vector3df(0,5,0));
+	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(7.0f, 12.0f, -9.0f), core::vector3df(3.0f, 8.0f, 6.0f), 590,  400);
+	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.15,.14,-.30), core::vector3df(0,.05,0));
 // 2*********
 
 	// 
@@ -477,12 +476,12 @@ int main(int argc, char* argv[])
 	//
  
 	application.SetStepManage(true);
-	application.SetTimestep(.01);
+	application.SetTimestep(.025);  //Arman modify
 //std::cout<<"reay to simulate"<<std::endl;
 
-	outForceData << "time, forceX, forceY, forceZ, forceMag, shipVelocity, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
-	while(application.GetDevice()->run())
+	while(application.GetDevice()->run() && mphysicalSystem.GetChTime() < 20) //arman modify
 	{
 		myTimer.start();
 // 1********* irrlicht initialization 8888
@@ -508,6 +507,8 @@ int main(int argc, char* argv[])
 		ChVector<> mForce;
 		ChVector<> mTorque;
 		calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
+		ChVector<> icePressure = mForce / (numLayers * 2 * mradius * cos(CH_C_PI / 6)) / ship_width;
+
 
 		myTimer.stop();
 		//****************************************************
@@ -522,11 +523,13 @@ int main(int argc, char* argv[])
 			energy += pow((*ibody)->GetPos_dt().Length() , 2);
 			ibody++;
 		}
-		printf("time %f, force %f %f %f, shipVelocity %f, simulation time %f, energy %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, shipPtr->GetBody()->GetPos_dt().z, myTimer(), energy);
+//		printf("time %f, force %f %f %f, shipVelocity %f, simulation time %f, energy %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, shipPtr->GetBody()->GetPos_dt().z, myTimer(), energy);
 		outForceData << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
-				mForce.Length() << ", " << shipPtr->GetBody()->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
+				mForce.Length() << ", " <<
+				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
+				shipPtr->GetBody()->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
 
-
+		printf("Time %f\n", mphysicalSystem.GetChTime());
 	}
 	outForceData.close();
 	return 0;
