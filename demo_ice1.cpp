@@ -68,10 +68,10 @@ using namespace std;
 const double rhoF = 1000;
 const double rhoR = 917;
 const double mu_Viscosity = 1;//.1;
-const ChVector<> surfaceLoc = ChVector<>(0, 9, -8);
+const ChVector<> surfaceLoc = ChVector<>(0, .09, -.08);
 
 //******************* ship and sphere stuff
-double mradius = .02;
+double mradius = .05;
 int numLayers = 3;
 
 ChBodySceneNode* shipPtr;
@@ -126,7 +126,7 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 		double A_ref = 0.5 * CH_C_PI * rad * (rad - dist);
 		double multDrag = 1;
 		if (mphysicalSystem.GetChTime() < timePause) {
-			multDrag = 1000;
+			multDrag = 1;
 		} else {
 			multDrag = 1;
 		}
@@ -206,14 +206,14 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 	  ChBody * body_A = model_A->GetBody();
 	  ChBody * body_B = model_B->GetBody();
 
-	  if (body_A == shipPtr->GetBody().get_ptr()) {
+	  if (body_A == (ChBody*)shipPtr->GetBody().get_ptr()) {
 		  mForce -= force_abs;
 
 		  ChVector<> point_on_A = (*it)->GetContactP1();
 		  mTorque -= (point_on_A - body_A->GetPos()) % force_abs;
 //		  ChVector<> local_point_on_A = ChTransform<>::TransformParentToLocal(point_on_A, body_A->GetPos(), body_A->GetRot());
 //		  mTorque += local_point_on_A % force;
-	  } else if (body_B == shipPtr->GetBody().get_ptr()) {
+	  } else if (body_B == (ChBody*)shipPtr->GetBody().get_ptr()) {
 		  mForce += force_abs;
 
 		  ChVector<> point_on_B = (*it)->GetContactP2();
@@ -265,13 +265,13 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	//**************** add walls
 	//*** side wall 1
 	double wall_width = .60;
-	double ship_height = .01;
+	double ship_height = .005;
 	double ship_length = 2.00;
 	ChBodySceneNode* wallPtr;
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
 											rhoR,
-											ChVector<>(boxMin.x - ship_height/2, 0, .50),
+											ChVector<>(boxMin.x - ship_height/2, 0, .40),
 											ChQuaternion<>(1,0,0,0),
 											ChVector<>(ship_height,wall_width,ship_length) );
 	wallPtr->GetBody()->SetBodyFixed(true);
@@ -354,7 +354,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 				mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
 
 				// Some aesthetics for 3d view..
-				mrigidBody->addShadowVolumeSceneNode();
+				//mrigidBody->addShadowVolumeSceneNode();
 				mrigidBody->setMaterialTexture(0,	sphereMap);
 
 				create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
@@ -362,6 +362,32 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 		}
 
 	}
+
+//	// Create a ball that will collide with wall
+//	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
+//	double minert = (2./5.)* mmass * pow(mradius,2);
+//
+//	mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
+//										&mphysicalSystem, msceneManager,
+//										mmass, // mass
+//										ChVector<>(.5 * (boxMax.x + boxMin.x),  .09, shipInitialPosZ + 2*mradius),
+//										mradius, // radius
+//										20,  // hslices, for rendering
+//										15); // vslices, for rendering
+//
+//	// set moment of inertia (more realistic than default 1,1,1).
+//	mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
+//	mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
+//	mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
+//	mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
+//	mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
+//	mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
+//
+//	// Some aesthetics for 3d view..
+//	mrigidBody->addShadowVolumeSceneNode();
+//	mrigidBody->setMaterialTexture(0,	sphereMap);
+//
+//	create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
 
 	//*** create ship
 	double boxMass = rhoR * box_X * box_Y * box_Z;
@@ -391,11 +417,6 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	pullingForce->SetVpoint(shipPtr->GetBody()->GetPos());
 	pullingForce->SetMforce(0);
 	pullingForce->SetDir(ChVector<>(1,0,0));
-
-//	ChSharedPtr<ChForce> shipForce = ChSharedPtr<ChForce>(new ChForce);
-//	shipPtr->GetBody()->AddForce(shipForce);
-//	shipForce->SetMforce(10000);
-//	shipForce->SetDir(ChVector<>(0,0,1));
 
 	//***** prismatic constraint between ship and bed
 //	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
@@ -446,8 +467,8 @@ int main(int argc, char* argv[])
 	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
 	ChIrrWizard::add_typical_Logo  (application.GetDevice());
 	ChIrrWizard::add_typical_Sky   (application.GetDevice());
-	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(7.0f, 12.0f, -9.0f), core::vector3df(3.0f, 8.0f, 6.0f), 590,  400);
-	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.15,.14,-.30), core::vector3df(0,.05,0));
+	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(.7f, 2.2f, -.9f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
+	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.15,.4,-.40), core::vector3df(0,.05,0));
 // 2*********
 
 	// 
@@ -463,7 +484,7 @@ int main(int argc, char* argv[])
 
 	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_SOR);
 	mphysicalSystem.SetUseSleeping(false);
-	mphysicalSystem.SetMaxPenetrationRecoverySpeed(1); // used by Anitescu stepper only
+	mphysicalSystem.SetMaxPenetrationRecoverySpeed(.01); // used by Anitescu stepper only
 	mphysicalSystem.SetIterLCPmaxItersSpeed(500);
 	//mphysicalSystem.SetIterLCPmaxItersStab(20); // unuseful for Anitescu, only Tasora uses this
 	//mphysicalSystem.SetIterLCPwarmStarting(true);
