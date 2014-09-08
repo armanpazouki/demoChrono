@@ -67,7 +67,7 @@ using namespace std;
 
 const double rhoF = 1000;
 const double rhoR = 917;
-const double mu_Viscosity = 1;//.1;
+const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .09, -.08);
 
 //******************* ship and sphere stuff
@@ -497,14 +497,14 @@ int main(int argc, char* argv[])
 
 	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_SOR);
 	mphysicalSystem.SetUseSleeping(false);
-	mphysicalSystem.SetMaxPenetrationRecoverySpeed(.003); // used by Anitescu stepper only
+	mphysicalSystem.SetMaxPenetrationRecoverySpeed(.01); // used by Anitescu stepper only
 	mphysicalSystem.SetIterLCPmaxItersSpeed(500);
 	//mphysicalSystem.SetIterLCPmaxItersStab(20); // unuseful for Anitescu, only Tasora uses this
 	//mphysicalSystem.SetIterLCPwarmStarting(true);
 	//mphysicalSystem.SetParallelThreadNumber(2);
 
 	mphysicalSystem.SetTol(0);
-	mphysicalSystem.SetTolSpeeds(.01 * shipVelocity);
+	mphysicalSystem.SetTolSpeeds(0);
 	//
 	// THE SOFT-REAL-TIME CYCLE
 	//
@@ -565,7 +565,7 @@ int main(int argc, char* argv[])
 				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
 				shipPtr->GetBody()->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
 
-		printf("Time %f, energy %f\n", mphysicalSystem.GetChTime(), energy);
+		printf("Time %f, energy %f, time per step %f\n", mphysicalSystem.GetChTime(), energy, myTimer());
 	}
 	outForceData.close();
 	return 0;
