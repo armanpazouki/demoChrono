@@ -80,7 +80,7 @@ double shipInitialPosZ = 0;
 const double timePause = .1; //arman modify
 double ship_width = .20;
 double box_X = ship_width, box_Y = .50, box_Z = .02;
-double collisionEvelop = .06 * mradius;
+double collisionEvelop = 0;//.06 * mradius;
 //**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
@@ -278,7 +278,9 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop); //envelop is .03 by default
+
 
 	//*** side wall 2
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
@@ -290,7 +292,8 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop); //envelop is .03 by default
 
 	//*** end wall
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
@@ -302,7 +305,8 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop);
 
 	//*** beginning walls
 	double hole_width = 1.2 * ship_width;
@@ -316,7 +320,9 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop); //envelop is .03 by default
+
 
 	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
 											&mphysicalSystem, msceneManager,
@@ -327,7 +333,9 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	wallPtr->GetBody()->SetBodyFixed(true);
 	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
 	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop); //envelop is .03 by default
+
 
 
 	//**************** sphere prob
@@ -358,7 +366,9 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 				mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
 				mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
 				mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-				mrigidBody->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//				mrigidBody->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+				mrigidBody->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop); //envelop is .03 by default
+
 
 				// Some aesthetics for 3d view..
 				//mrigidBody->addShadowVolumeSceneNode();
@@ -413,7 +423,9 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	shipPtr->GetBody()->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
 	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
 	shipPtr->setMaterialTexture(0,	cubeMap);
-	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEvelop); //envelop is .03 by default
+	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEvelop); //envelop is .03 by default
+
 
 	shipPtr->addShadowVolumeSceneNode();
 	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,0));
