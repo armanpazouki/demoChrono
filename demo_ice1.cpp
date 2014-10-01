@@ -32,17 +32,19 @@
   
  
 //#include "physics/ChApidll.h"
-#include "physics/ChSystem.h"
-#include "unit_IRRLICHT/ChBodySceneNode.h"
-#include "unit_IRRLICHT/ChBodySceneNodeTools.h"
+//#include "unit_IRRLICHT/ChBodySceneNode.h"
+//#include "unit_IRRLICHT/ChBodySceneNodeTools.h"
 #include "unit_IRRLICHT/ChIrrAppInterface.h"
-#include "core/ChRealtimeStep.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
+#include "physics/ChSystem.h"
 #include "physics/ChMaterialSurface.h"
 #include "physics/ChController.h"
-#include "collision/ChCModelBulletBody.h"
+#include "physics/ChBodyEasy.h"
 #include "physics/ChContactContainer.h"
+#include "collision/ChCModelBulletBody.h"
 #include "core/ChTimer.h"
+#include "core/ChRealtimeStep.h"
+#include "assets/ChTexture.h"
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -74,7 +76,8 @@ const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 double mradius = .02;
 int numLayers = 5;
 
-ChBodySceneNode* shipPtr;
+//ChBodySceneNode* shipPtr;
+ChSharedPtr<ChBodyEasyBox> shipPtr;
 const double shipVelocity = .27;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
 const double timePause = .1; //arman modify
@@ -207,14 +210,14 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 	  ChBody * body_A = model_A->GetBody();
 	  ChBody * body_B = model_B->GetBody();
 
-	  if (body_A == (ChBody*)shipPtr->GetBody().get_ptr()) {
+	  if (body_A == (ChBody*)shipPtr.get_ptr()) {
 		  mForce -= force_abs;
 
 		  ChVector<> point_on_A = (*it)->GetContactP1();
 		  mTorque -= (point_on_A - body_A->GetPos()) % force_abs;
 //		  ChVector<> local_point_on_A = ChTransform<>::TransformParentToLocal(point_on_A, body_A->GetPos(), body_A->GetRot());
 //		  mTorque += local_point_on_A % force;
-	  } else if (body_B == (ChBody*)shipPtr->GetBody().get_ptr()) {
+	  } else if (body_B == (ChBody*)shipPtr.get_ptr()) {
 		  mForce += force_abs;
 
 		  ChVector<> point_on_B = (*it)->GetContactP2();
@@ -228,10 +231,9 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 
 void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
 {
-
-	ChBodySceneNode* mrigidBody;
 	ChSharedPtr<ChMaterialSurface> mmaterial(new ChMaterialSurface);
 	mmaterial->SetFriction(0.4f);
+	mmaterial->SetDampingF(0.2f);
 
 		//mmaterial->SetCompliance (0.00005f);
 		//mmaterial->SetComplianceT(0.00005f);
@@ -250,16 +252,18 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	// fixed rigid body of 'box' type:
 
 	//*** create bed
-	ChBodySceneNode* earthPtr;
-	earthPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>(0,-.40,0),
-											ChQuaternion<>(1,0,0,0), 
-											ChVector<>(5.50,.04,5.50) );
-	earthPtr->GetBody()->SetBodyFixed(true);
-	earthPtr->GetBody()->SetMaterialSurface(mmaterial);
-	earthPtr->GetBody()->SetCollide(false);
+
+
+	ChSharedPtr<ChBodyEasyBox> earthPtr(new ChBodyEasyBox(
+											5.50,.04,5.50, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	earthPtr->SetPos(ChVector<>(0,-.40,0));
+	earthPtr->SetRot(ChQuaternion<>(1,0,0,0));
+	earthPtr->SetBodyFixed(true);
+	earthPtr->SetMaterialSurface(mmaterial);
+	earthPtr->SetCollide(false);
 
 	//*****
 	ChVector<> boxMin = ChVector<>(-.04, .09, -.12);
@@ -268,75 +272,79 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	//*** side wall 1
 	double wall_width = .60;
 	double ship_height = .005;
-	ChBodySceneNode* wallPtr;
-	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>(boxMin.x - ship_height/2, 0, .50),
-											ChQuaternion<>(1,0,0,0),
-											ChVector<>(ship_height,wall_width,1.5) );
-	wallPtr->GetBody()->SetBodyFixed(true);
-	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+
+	ChSharedPtr<ChBodyEasyBox> wallPtr1(new ChBodyEasyBox(
+											ship_height,wall_width,1.5, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	wallPtr1->SetPos(ChVector<>(boxMin.x - ship_height/2, 0, .50));
+	wallPtr1->SetRot(ChQuaternion<>(1,0,0,0));
+	wallPtr1->SetBodyFixed(true);
+	wallPtr1->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr1->GetMaterialSurface()->SetDampingF(0.2);
+	wallPtr1->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(wallPtr1);
 
 
 	//*** side wall 2
-	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>(boxMax.x + ship_height/2, 0, .50),
-											ChQuaternion<>(1,0,0,0),
-											ChVector<>(ship_height,wall_width,1.5) );
-	wallPtr->GetBody()->SetBodyFixed(true);
-	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+
+	ChSharedPtr<ChBodyEasyBox> wallPtr2(new ChBodyEasyBox(
+											ship_height,wall_width,1.5, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	wallPtr2->SetPos(ChVector<>(boxMax.x + ship_height/2, 0, .50));
+	wallPtr2->SetRot(ChQuaternion<>(1,0,0,0));
+	wallPtr2->SetBodyFixed(true);
+	wallPtr2->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr2->GetMaterialSurface()->SetDampingF(0.2);
+	wallPtr2->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(wallPtr2);
 
 	//*** end wall
-	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>((boxMin.x + boxMax.x)/2, 0, boxMax.z),
-											ChQuaternion<>(1,0,0,0),
-											ChVector<>(boxMax.x - boxMin.x, wall_width, ship_height) );
-	wallPtr->GetBody()->SetBodyFixed(true);
-	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop);
+
+	ChSharedPtr<ChBodyEasyBox> wallPtr3(new ChBodyEasyBox(
+											boxMax.x - boxMin.x, wall_width, ship_height, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	wallPtr3->SetPos(ChVector<>((boxMin.x + boxMax.x)/2, 0, boxMax.z));
+	wallPtr3->SetRot(ChQuaternion<>(1,0,0,0));
+	wallPtr3->SetBodyFixed(true);
+	wallPtr3->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr3->GetMaterialSurface()->SetDampingF(0.2);
+	wallPtr3->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(wallPtr3);
 
 	//*** beginning walls
 	double hole_width = 1.2 * ship_width;
 	double small_wall_Length = 0.5 * (boxMax.x - boxMin.x - hole_width);
-	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>(boxMin.x + .5 * small_wall_Length, 0, boxMin.z - ship_height/2),
-											ChQuaternion<>(1,0,0,0),
-											ChVector<>( small_wall_Length, wall_width, ship_height) );
-	wallPtr->GetBody()->SetBodyFixed(true);
-	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	ChSharedPtr<ChBodyEasyBox> wallPtr4(new ChBodyEasyBox(
+											small_wall_Length, wall_width, ship_height, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	wallPtr4->SetPos(ChVector<>(boxMin.x + .5 * small_wall_Length, 0, boxMin.z - ship_height/2));
+	wallPtr4->SetRot(ChQuaternion<>(1,0,0,0));
+	wallPtr4->SetBodyFixed(true);
+	wallPtr4->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr4->GetMaterialSurface()->SetDampingF(0.2);
+	wallPtr4->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(wallPtr4);
 
-
-	wallPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-											&mphysicalSystem, msceneManager,
-											rhoR,
-											ChVector<>(boxMax.x - .5 * small_wall_Length, 0, boxMin.z - ship_height/2),
-											ChQuaternion<>(1,0,0,0),
-											ChVector<>( small_wall_Length, wall_width, ship_height) );
-	wallPtr->GetBody()->SetBodyFixed(true);
-	wallPtr->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-	wallPtr->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
-
-
+	ChSharedPtr<ChBodyEasyBox> wallPtr5(new ChBodyEasyBox(
+											small_wall_Length, wall_width, ship_height, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	wallPtr5->SetPos(ChVector<>(boxMax.x - .5 * small_wall_Length, 0, boxMin.z - ship_height/2));
+	wallPtr5->SetRot(ChQuaternion<>(1,0,0,0));
+	wallPtr5->SetBodyFixed(true);
+	wallPtr5->GetMaterialSurface()->SetFriction(0.4f);
+	wallPtr5->GetMaterialSurface()->SetDampingF(0.2);
+	wallPtr5->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(wallPtr5);
 
 	//**************** sphere prob
 	// note: dimensions are in cm
@@ -351,91 +359,78 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
 				double minert = (2./5.)* mmass * pow(mradius,2);
 
-				mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
-													&mphysicalSystem, msceneManager,
-													mmass, // mass
-													ChVector<>(i * spacing, j * spacing, k * spacing) + (boxMin + .5 * ChVector<>(spacing,spacing,spacing)) + .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom()) , // pos
-													mradius, // radius
-													20,  // hslices, for rendering
-													15); // vslices, for rendering
+
+
+
+				ChSharedPtr<ChBodyEasySphere> mrigidBody(new ChBodyEasySphere(
+														mradius,			// radius
+														rhoR,		// density
+														true,		// collide enable?
+														true));		// visualization?
+				mrigidBody->SetPos(
+						ChVector<>(i * spacing, j * spacing, k * spacing)
+						+ (boxMin + .5 * ChVector<>(spacing,spacing,spacing))
+						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
+						);
 
 				// set moment of inertia (more realistic than default 1,1,1).
-				mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
-				mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
-				mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-				mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
-				mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
-				mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//				mrigidBody->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-				mrigidBody->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+				mrigidBody->SetInertiaXX(ChVector<>(minert,minert,minert));
+				mrigidBody->SetPos_dt(ChVector<>(0,0,0));
+				mrigidBody->GetMaterialSurface()->SetFriction(0.4f);
+				mrigidBody->GetMaterialSurface()->SetCompliance(0.0);
+				mrigidBody->GetMaterialSurface()->SetComplianceT(0.0);
+				mrigidBody->GetMaterialSurface()->SetDampingF(0.2);
+				mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
 
+				create_hydronynamic_force(mrigidBody.get_ptr(), mphysicalSystem, surfaceLoc, true);
 
-				// Some aesthetics for 3d view..
-				//mrigidBody->addShadowVolumeSceneNode();
-				mrigidBody->setMaterialTexture(0,	sphereMap);
-
-				create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
+				// optional, attach a texture for better visualization
+				ChSharedPtr<ChTexture> mtextureball(new ChTexture());
+				mtextureball->SetTextureFilename(GetChronoDataFile("../data/bluwhite.png"));
+				mrigidBody->AddAsset(mtextureball);
 			}
 		}
 
 	}
-
-//	// Create a ball that will collide with wall
-//	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-//	double minert = (2./5.)* mmass * pow(mradius,2);
-//
-//	mrigidBody = (ChBodySceneNode*)addChBodySceneNode_easySphere(
-//										&mphysicalSystem, msceneManager,
-//										mmass, // mass
-//										ChVector<>(.5 * (boxMax.x + boxMin.x),  .09, shipInitialPosZ + 2*mradius),
-//										mradius, // radius
-//										20,  // hslices, for rendering
-//										15); // vslices, for rendering
-//
-//	// set moment of inertia (more realistic than default 1,1,1).
-//	mrigidBody->GetBody()->SetInertiaXX(ChVector<>(minert,minert,minert));
-//	mrigidBody->GetBody()->SetPos_dt(ChVector<>(0,0,0));
-//	mrigidBody->GetBody()->GetMaterialSurface()->SetFriction(0.4f);
-//	mrigidBody->GetBody()->GetMaterialSurface()->SetCompliance(0.0);
-//	mrigidBody->GetBody()->GetMaterialSurface()->SetComplianceT(0.0);
-//	mrigidBody->GetBody()->GetMaterialSurface()->SetDampingF(0.2);
-//
-//	// Some aesthetics for 3d view..
-//	mrigidBody->addShadowVolumeSceneNode();
-//	mrigidBody->setMaterialTexture(0,	sphereMap);
-//
-//	create_hydronynamic_force(mrigidBody->GetBody().get_ptr(), mphysicalSystem, surfaceLoc, true);
 
 	//*** create ship
 	double boxMass = rhoR * box_X * box_Y * box_Z;
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
 	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
 	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
-
 	shipInitialPosZ = boxMin.z - .5 * box_Z;
-	shipPtr = (ChBodySceneNode*)addChBodySceneNode_easyBox(
-										&mphysicalSystem, msceneManager,
-										boxMass,
-										ChVector<>(.5 * (boxMax.x + boxMin.x),  .09, shipInitialPosZ),
-										ChQuaternion<>(1,0,0,0),
-										ChVector<>(box_X, box_Y, box_Z) );
-	shipPtr->GetBody()->SetMass(boxMass);
-	shipPtr->GetBody()->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
-	shipPtr->GetBody()->SetMaterialSurface(mmaterial);
-	shipPtr->setMaterialTexture(0,	cubeMap);
-//	wallPtr->GetBody()->GetCollisionModel()->SetEnvelope(collisionEnvelop); //envelop is .03 by default
-	wallPtr->GetBody()->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+
+	shipPtr = ChSharedPtr<ChBodyEasyBox>(new ChBodyEasyBox(
+											box_X, box_Y, box_Z, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	shipPtr->SetPos(ChVector<>(.5 * (boxMax.x + boxMin.x),  .09, shipInitialPosZ));
+	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
+//	wallPtr1->SetBodyFixed(false);
+	shipPtr->GetMaterialSurface()->SetFriction(0.4f);
+	shipPtr->GetMaterialSurface()->SetDampingF(0.2);
+//	shipPtr->SetMaterialSurface(mmaterial);
+	shipPtr->SetPos_dt(ChVector<>(0,0,0));
+	shipPtr->SetMass(boxMass);
+	shipPtr->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
+	shipPtr->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(shipPtr);
+
+	// optional, attach a texture for better visualization
+	ChSharedPtr<ChTexture> mtexturebox(new ChTexture());
+	mtexturebox->SetTextureFilename(GetChronoDataFile("../data/cubetexture_borders.png"));
+	shipPtr->AddAsset(mtexturebox);
 
 
-	shipPtr->addShadowVolumeSceneNode();
-	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,0));
+
 	char forceTag[] = "pulling_force";
 	ChSharedPtr<ChForce> pullingForce = ChSharedPtr<ChForce>(new ChForce);
 	pullingForce->SetMode(FTYPE_FORCE); // no need for this. It is the default option.
-	shipPtr->GetBody()->AddForce(pullingForce);
+	shipPtr->AddForce(pullingForce);
 	// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce());
 	pullingForce->SetName(forceTag);
-	pullingForce->SetVpoint(shipPtr->GetBody()->GetPos());
+	pullingForce->SetVpoint(shipPtr->GetPos());
 	pullingForce->SetMforce(0);
 	pullingForce->SetDir(ChVector<>(1,0,0));
 
@@ -445,7 +440,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 //			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
 //			);
 	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
-	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
+	shipConstraint->Initialize(shipPtr, earthPtr,
 			ChCoordsys<>(ChVector<>(.30,  .09, -.25) , QUNIT)
 			);
 	mphysicalSystem.AddLink(shipConstraint);
@@ -455,7 +450,7 @@ void MoveShip(ChSystem& mphysicalSystem) {
 	static bool onCall = false;
 //	if (!onCall) {
 //		onCall = true;
-		shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
+		shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
 //	}
 //    ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
 //    my_controllerPID->P = 1.0e9;
@@ -470,7 +465,7 @@ void MoveShip(ChSystem& mphysicalSystem) {
 }
 
 void FixShip(ChSystem& mphysicalSystem) {
-	shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,0));
+	shipPtr->SetPos_dt(ChVector<>(0,0,0));
 }
  
 int main(int argc, char* argv[])
@@ -503,7 +498,7 @@ int main(int argc, char* argv[])
  
 	// Create all the rigid bodies.
 	create_ice_particles(mphysicalSystem, application.GetSceneManager(), application.GetVideoDriver());
-  
+
   
 	// Prepare the physical system for the simulation 
 
@@ -575,7 +570,7 @@ int main(int argc, char* argv[])
 		outForceData << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
 				mForce.Length() << ", " <<
 				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
-				shipPtr->GetBody()->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
+				shipPtr->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
 
 		printf("Time %f, energy %f, time per step %f\n", mphysicalSystem.GetChTime(), energy, myTimer());
 	}
