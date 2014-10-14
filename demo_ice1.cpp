@@ -34,7 +34,7 @@
 //#include "physics/ChApidll.h"
 //#include "unit_IRRLICHT/ChBodySceneNode.h"
 //#include "unit_IRRLICHT/ChBodySceneNodeTools.h"
-#include "unit_IRRLICHT/ChIrrAppInterface.h"
+//#include "unit_IRRLICHT/ChIrrAppInterface.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
 #include "physics/ChSystem.h"
 #include "physics/ChMaterialSurface.h"
@@ -45,6 +45,7 @@
 #include "core/ChTimer.h"
 #include "core/ChRealtimeStep.h"
 #include "assets/ChTexture.h"
+#include "unit_IRRLICHT/ChIrrApp.h"
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -64,8 +65,6 @@ using namespace video;
 using namespace io;
 using namespace gui;
 using namespace std;
-
-
 
 const double rhoF = 1000;
 const double rhoR = 917;
@@ -229,7 +228,7 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 }
 
 
-void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManager, IVideoDriver* driver)
+void create_ice_particles(ChSystem& mphysicalSystem)
 {
 	ChSharedPtr<ChMaterialSurface> mmaterial(new ChMaterialSurface);
 	mmaterial->SetFriction(0.4f);
@@ -240,20 +239,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 		//mmaterial->SetDampingF(0.2);
 		//mmaterial->SetCohesion(0.05);
 
-	// Create a bunch of ChronoENGINE rigid bodies (spheres and
-	// boxes) which will fall..
-	// Bodies are Irrlicht nodes of the special class ChBodySceneNode, 
-	// which encapsulates ChBody items).  
-	
-	video::ITexture* cubeMap   = driver->getTexture("../data/cubetexture_borders.png");
-	video::ITexture* sphereMap = driver->getTexture("../data/bluwhite.png");
-
-	// Create the floor using
-	// fixed rigid body of 'box' type:
-
 	//*** create bed
-
-
 	ChSharedPtr<ChBodyEasyBox> earthPtr(new ChBodyEasyBox(
 											5.50,.04,5.50, // x,y,z size
 											rhoR,		// density
@@ -264,6 +250,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 	earthPtr->SetBodyFixed(true);
 	earthPtr->SetMaterialSurface(mmaterial);
 	earthPtr->SetCollide(false);
+	mphysicalSystem.Add(earthPtr);
 
 	//*****
 	ChVector<> boxMin = ChVector<>(-.04, .09, -.12);
@@ -381,6 +368,7 @@ void create_ice_particles(ChSystem& mphysicalSystem, ISceneManager* msceneManage
 				mrigidBody->GetMaterialSurface()->SetComplianceT(0.0);
 				mrigidBody->GetMaterialSurface()->SetDampingF(0.2);
 				mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+				mphysicalSystem.Add(mrigidBody);
 
 				create_hydronynamic_force(mrigidBody.get_ptr(), mphysicalSystem, surfaceLoc, true);
 
@@ -475,33 +463,38 @@ int main(int argc, char* argv[])
 	// global functions are needed.
 //	DLL_CreateGlobals();
 
+#define irrlichtVisualization true
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
+	double dT = 0.0004;
 
-	// Create the Irrlicht visualization (open the Irrlicht device,
-	// bind a simple user interface, etc. etc.)
-	ChIrrAppInterface application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true);
 	fstream outForceData("forceData.txt", ios::out);
-// 1*********
-  // *** Irrlicht stuff, deactivated
-	// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
-	ChIrrWizard::add_typical_Logo  (application.GetDevice());
-	ChIrrWizard::add_typical_Sky   (application.GetDevice());
-	ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(.7f, 2.2f, -.9f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
-	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.15,.4,-.40), core::vector3df(0,.05,0));
-// 2*********
 
-	// 
-	// HERE YOU CREATE THE MECHANICAL SYSTEM OF CHRONO... 
-	// 
-
- 
 	// Create all the rigid bodies.
-	create_ice_particles(mphysicalSystem, application.GetSceneManager(), application.GetVideoDriver());
+	create_ice_particles(mphysicalSystem);
 
-  
+#if irrlichtVisualization
+		// Create the Irrlicht visualization (open the Irrlicht device,
+		// bind a simple user interface, etc. etc.)
+		ChIrrApp application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true);
+		// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
+		ChIrrWizard::add_typical_Logo  (application.GetDevice());
+		ChIrrWizard::add_typical_Sky   (application.GetDevice());
+		ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(.7f, 2.2f, -.9f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
+		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.15,.4,-.40), core::vector3df(0,.05,0));
+		// Use this function for adding a ChIrrNodeAsset to all items
+		// If you need a finer control on which item really needs a visualization proxy in
+		// Irrlicht, just use application.AssetBind(myitem); on a per-item basis.
+		application.AssetBindAll();
+		// Use this function for 'converting' into Irrlicht meshes the assets
+		// into Irrlicht-visualizable meshes
+		application.AssetUpdateAll();
+
+		application.SetStepManage(true);
+		application.SetTimestep(dT);  					//Arman modify
+#endif
+
 	// Prepare the physical system for the simulation 
-
 	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_APGD);
 	mphysicalSystem.SetUseSleeping(false);
 	mphysicalSystem.SetMaxPenetrationRecoverySpeed(2 * shipVelocity); // used by Anitescu stepper only
@@ -512,31 +505,24 @@ int main(int argc, char* argv[])
 
 	mphysicalSystem.SetTol(0);
 	mphysicalSystem.SetTolSpeeds(0);
-	//
-	// THE SOFT-REAL-TIME CYCLE
-	//
- 
-	application.SetStepManage(true);
-	application.SetTimestep(.0004);  //Arman modify
-//std::cout<<"reay to simulate"<<std::endl;
 
 	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
-	while(application.GetDevice()->run() && mphysicalSystem.GetChTime() < 20) //arman modify
+
+	while(mphysicalSystem.GetChTime() < 20) //arman modify
 	{
 		myTimer.start();
-// 1********* irrlicht initialization 8888
+#if irrlichtVisualization
+		if ( !(application.GetDevice()->run()) ) break;
 		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
 		ChIrrTools::drawGrid(application.GetVideoDriver(), .05,.05, 40,40,
 			ChCoordsys<>(ChVector<>(0,-.30,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
 		application.DrawAll();
-// 2*********
 		application.DoStep();
-//		std::cout<<"after step"<<std::endl;
-
-// 1*********
 		application.GetVideoDriver()->endScene();
-// 2*********
+#else
+		mphysicalSystem.DoStepDynamics(dT);
+#endif
 		if (mphysicalSystem.GetChTime() > timePause) {
 			MoveShip(mphysicalSystem);
 			//shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
