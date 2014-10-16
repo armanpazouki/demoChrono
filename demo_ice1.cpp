@@ -472,7 +472,7 @@ int main(int argc, char* argv[])
 	// global functions are needed.
 //	DLL_CreateGlobals();
 
-#define irrlichtVisualization true
+#define irrlichtVisualization false
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
 	double dT = 0.005;
