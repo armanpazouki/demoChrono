@@ -79,10 +79,11 @@ int numLayers = 5;
 ChSharedPtr<ChBodyEasyBox> shipPtr;
 const double shipVelocity = .27;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
-const double timePause = .1; //arman modify
+const double timePause = 0.5; //arman modify
 double ship_width = .20;
 double box_X = ship_width, box_Y = .50, box_Z = .02;
 double collisionEnvelop = .06 * mradius;
+ChVector<> shipInitialPos;
 //**********************************
 
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
@@ -93,7 +94,7 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 
 
 	// ***** calculation of force
-	ChVector<> freeSurfaceNormal = -mphysicalSystem.Get_G_acc();
+	ChVector<> freeSurfaceNormal = -mphysicalSystem.Get_G_acc(); // The default acceleration is (0, -9.81, 0);
 	double g = freeSurfaceNormal.Length();
 	freeSurfaceNormal.Normalize();
 
@@ -101,7 +102,8 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	ChVector<> dist3 = bodyCtr - freeSurfaceLocation;
 	double dist = dist3.Dot(freeSurfaceNormal); // distance of the sphere center from the fluid surface
 
-	double rad = mrigidBody->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
+	//mrigidBody->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
+	double rad = mradius;
 
 	//****************** Buoyancy Force
 	ChVector<> F_Buoyancy = ChVector<>(0,0,0);
@@ -125,18 +127,18 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	double Cd = 0.4;
 	ChVector<> vel = mrigidBody->GetPos_dt();
 	ChVector<> F_Drag = ChVector<>(0,0,0);
-	if (dist < rad) {
-		double A_ref = 0.5 * CH_C_PI * rad * (rad - dist);
-		double multDrag = 1;
-		if (mphysicalSystem.GetChTime() < timePause) {
-			multDrag = 100;
-		} else {
-			multDrag = 1;
-		}
-		F_Drag = multDrag * (-6.0 * CH_C_PI * mu_Viscosity * rad * vel
-					-0.5 * rhoF * Cd * vel.Length() * vel);
-		T_Drag = -8.0 * CH_C_PI * mu_Viscosity * pow(rad, 3) * mrigidBody->GetWvel_par(); // in parent, i.e. absoute, reference frame.
-	}
+//	if (dist < rad) {
+//		double A_ref = 0.5 * CH_C_PI * rad * (rad - dist);
+//		double multDrag = 1;
+//		if (mphysicalSystem.GetChTime() < timePause) {
+//			multDrag = 1;
+//		} else {
+//			multDrag = 1;
+//		}
+//		F_Drag = multDrag * (-6.0 * CH_C_PI * mu_Viscosity * rad * vel
+//					-0.5 * rhoF * Cd * vel.Length() * vel);
+//		T_Drag = -8.0 * CH_C_PI * mu_Viscosity * pow(rad, 3) * mrigidBody->GetWvel_par(); // in parent, i.e. absoute, reference frame.
+//	}
 	//****************** Total Force
 	F_Hydro = F_Buoyancy + F_Drag; // it is assumed that F_Drag is applied at the buoyancy center
 }
@@ -334,29 +336,27 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mphysicalSystem.Add(wallPtr5);
 
 	//**************** sphere prob
-	// note: dimensions are in cm
 	double spacing = 2 * mradius*1.1;
 	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
 	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
 
+	double iceThickness = numLayers * mradius * 2;
+	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
 	for (int j = 0; j < numLayers; j++) {
 		for (int i = 0; i < numColX; i++) {
 			for (int k = 0; k < numColZ; k++) {
 				// Create a ball that will collide with wall
 				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
 				double minert = (2./5.)* mmass * pow(mradius,2);
-
-
-
-
 				ChSharedPtr<ChBodyEasySphere> mrigidBody(new ChBodyEasySphere(
 														mradius,			// radius
 														rhoR,		// density
 														true,		// collide enable?
 														true));		// visualization?
 				mrigidBody->SetPos(
-						ChVector<>(i * spacing, j * spacing, k * spacing)
-						+ (boxMin + .5 * ChVector<>(spacing,spacing,spacing))
+						ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z)
+						+ ChVector<>(i * spacing, j * spacing, k * spacing)
+						+ (.5 * ChVector<>(spacing,spacing,spacing))
 						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
 						);
 
@@ -393,7 +393,8 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	shipPtr->SetPos(ChVector<>(.5 * (boxMax.x + boxMin.x),  .09, shipInitialPosZ));
+	shipInitialPos = ChVector<>(.5 * (boxMax.x + boxMin.x),  .04, shipInitialPosZ);
+	shipPtr->SetPos(shipInitialPos);
 	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
 //	wallPtr1->SetBodyFixed(false);
 	shipPtr->GetMaterialSurface()->SetFriction(0.4f);
@@ -409,6 +410,7 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	ChSharedPtr<ChTexture> mtexturebox(new ChTexture());
 	mtexturebox->SetTextureFilename(GetChronoDataFile("../data/cubetexture_borders.png"));
 	shipPtr->AddAsset(mtexturebox);
+	//**** end ship initialization
 
 
 
@@ -438,7 +440,14 @@ void MoveShip(ChSystem& mphysicalSystem) {
 	static bool onCall = false;
 //	if (!onCall) {
 //		onCall = true;
+		ChVector<> shipVel = ChVector<>(0,0,shipVelocity);
+		ChVector<> shipPos = shipInitialPos + shipVel * (mphysicalSystem.GetChTime() - timePause);
+		shipPtr->SetPos(shipPos);
 		shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
+		shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
+		shipPtr->SetWvel_loc(ChVector<>(0,0,0));
+
+
 //	}
 //    ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
 //    my_controllerPID->P = 1.0e9;
@@ -466,7 +475,7 @@ int main(int argc, char* argv[])
 #define irrlichtVisualization true
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
-	double dT = 0.0004;
+	double dT = 0.005;
 
 	fstream outForceData("forceData.txt", ios::out);
 
@@ -495,7 +504,7 @@ int main(int argc, char* argv[])
 #endif
 
 	// Prepare the physical system for the simulation 
-	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_APGD);
+	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_SOR);
 	mphysicalSystem.SetUseSleeping(false);
 	mphysicalSystem.SetMaxPenetrationRecoverySpeed(2 * shipVelocity); // used by Anitescu stepper only
 	mphysicalSystem.SetIterLCPmaxItersSpeed(500);
@@ -506,7 +515,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.SetTol(0);
 	mphysicalSystem.SetTolSpeeds(0);
 
-	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 
 	while(mphysicalSystem.GetChTime() < 20) //arman modify
@@ -525,7 +534,6 @@ int main(int argc, char* argv[])
 #endif
 		if (mphysicalSystem.GetChTime() > timePause) {
 			MoveShip(mphysicalSystem);
-			//shipPtr->GetBody()->SetPos_dt(ChVector<>(0,0,shipVelocity));
 		} else {
 			FixShip(mphysicalSystem);
 		}
@@ -556,7 +564,7 @@ int main(int argc, char* argv[])
 		outForceData << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
 				mForce.Length() << ", " <<
 				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
-				shipPtr->GetPos_dt().z << ", " << energy << ", " << myTimer() << endl;
+				shipPtr->GetPos_dt().z << ", " << shipPtr->GetPos().z << ", " << energy << ", " << myTimer() << endl;
 
 		printf("Time %f, energy %f, time per step %f\n", mphysicalSystem.GetChTime(), energy, myTimer());
 	}
