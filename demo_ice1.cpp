@@ -104,7 +104,6 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 
 	//mrigidBody->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
 	double rad = mradius;
-
 	//****************** Buoyancy Force
 	ChVector<> F_Buoyancy = ChVector<>(0,0,0);
 	forceLoc = bodyCtr;
@@ -342,6 +341,7 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 
 	double iceThickness = numLayers * mradius * 2;
 	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
+	printf("************************** buttomaslkdfjlkasdj %f\n", buttomLayerDY);
 	for (int j = 0; j < numLayers; j++) {
 		for (int i = 0; i < numColX; i++) {
 			for (int k = 0; k < numColZ; k++) {
@@ -353,12 +353,12 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 														rhoR,		// density
 														true,		// collide enable?
 														true));		// visualization?
-				mrigidBody->SetPos(
+				ChVector<> pos = ChVector<>(
 						ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z)
-						+ ChVector<>(i * spacing, j * spacing, k * spacing)
-						+ (.5 * ChVector<>(spacing,spacing,spacing))
+						+ ChVector<>((i+0.5) * spacing, j * spacing, (k+0.5) * spacing)
 						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
 						);
+				mrigidBody->SetPos(pos);
 
 				// set moment of inertia (more realistic than default 1,1,1).
 				mrigidBody->SetInertiaXX(ChVector<>(minert,minert,minert));
@@ -380,6 +380,7 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 		}
 
 	}
+
 
 	//*** create ship
 	double boxMass = rhoR * box_X * box_Y * box_Z;
@@ -411,6 +412,19 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mtexturebox->SetTextureFilename(GetChronoDataFile("../data/cubetexture_borders.png"));
 	shipPtr->AddAsset(mtexturebox);
 	//**** end ship initialization
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -472,7 +486,7 @@ int main(int argc, char* argv[])
 	// global functions are needed.
 //	DLL_CreateGlobals();
 
-#define irrlichtVisualization false
+#define irrlichtVisualization true
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
 	double dT = 0.005;
@@ -518,7 +532,7 @@ int main(int argc, char* argv[])
 	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 
-	while(mphysicalSystem.GetChTime() < 20) //arman modify
+	while(mphysicalSystem.GetChTime() < 3.8) //arman modify
 	{
 		myTimer.start();
 #if irrlichtVisualization
