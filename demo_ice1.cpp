@@ -72,17 +72,18 @@ const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 //******************* ship and sphere stuff
-double mradius = .02;
-int numLayers = 5;
+double mradius = .4;
+int numLayers = 1;
 
 //ChBodySceneNode* shipPtr;
 ChSharedPtr<ChBodyEasyBox> shipPtr;
-const double shipVelocity = .27;//.27;//1; //arman modify
+const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
-const double timePause = 0.5; //arman modify
-double ship_width = .20;
-double box_X = ship_width, box_Y = .50, box_Z = .02;
-double collisionEnvelop = .06 * mradius;
+const double timePause = 1.0; //arman modify
+const double timeMove = 2.5;
+double ship_width = 4;
+double box_X = ship_width, box_Y = 10, box_Z = .4;
+double collisionEnvelop = .04 * mradius;
 ChVector<> shipInitialPos;
 //**********************************
 
@@ -227,8 +228,102 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 	  }
 	}
 }
+//***********************************
+void CreateSphere(ChSystem& mphysicalSystem, ChSharedPtr<ChBodyEasySphere> mrigidBody, ChVector<> pos, double mmass, double minert) {
+	mrigidBody->SetPos(pos);
 
+	// set moment of inertia (more realistic than default 1,1,1).
+	mrigidBody->SetInertiaXX(ChVector<>(minert,minert,minert));
+	mrigidBody->SetPos_dt(ChVector<>(0,0,0));
+	mrigidBody->GetMaterialSurface()->SetFriction(0.4f);
+	mrigidBody->GetMaterialSurface()->SetCompliance(0.0);
+	mrigidBody->GetMaterialSurface()->SetComplianceT(0.0);
+	mrigidBody->GetMaterialSurface()->SetDampingF(0.2);
+	mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+	mphysicalSystem.Add(mrigidBody);
 
+	create_hydronynamic_force(mrigidBody.get_ptr(), mphysicalSystem, surfaceLoc, true);
+
+	// optional, attach a texture for better visualization
+	ChSharedPtr<ChTexture> mtextureball(new ChTexture());
+	mtextureball->SetTextureFilename(GetChronoDataFile("../data/bluwhite.png"));
+	mrigidBody->AddAsset(mtextureball);
+}
+//***********************************
+void GenerateIceLayers_Rectangular(
+		ChSystem& mphysicalSystem,
+		int numColX,     //number of particles in x direction
+		int numLayers,   //number of particles in y direction
+		int numColZ,     //number of particles in z direction
+		double global_x, //global offset in x
+		double global_y, //global offset in y
+		double global_z,
+		double spacing,
+		double mmass,
+		double minert) //global offset in z
+{
+	for (int j = 0; j < numLayers; j++) {
+		for (int i = 0; i < numColX; i++) {
+			for (int k = 0; k < numColZ; k++) {
+				// Create a ball that will collide with wall
+				ChSharedPtr<ChBodyEasySphere> mrigidBody(new ChBodyEasySphere(
+														mradius,			// radius
+														rhoR,		// density
+														true,		// collide enable?
+														true));		// visualization?
+				ChVector<> pos = ChVector<>(
+						ChVector<>(global_x, global_y, global_z)
+						+ ChVector<>((i+0.5) * spacing, j * spacing, (k+0.5) * spacing)
+						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
+						);
+				CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
+			}
+		}
+
+	}
+}
+//***********************************
+void addHCPSheet(
+  int grid_x,       //number of particles in x direction
+  int grid_z,       //number of particles in z direction
+  double height,    //height of layer
+  double radius,    //radius of spheres
+  double global_x,  //global offset of sheet in x
+  double global_z)  //global offset of sheet in z
+{
+    double offset = 0;
+    double x = 0, y = height, z = 0;
+    for (int i = 0; i < grid_x; i++) {
+      for (int k = 0; k < grid_z; k++) {
+        //need to offset alternate rows by radius
+        offset = (k % 2 != 0) ? radius : 0;
+        //x position, shifted to center
+        x = i * 2 * radius + offset  - grid_x * 2 * radius / 2.0 + global_x;
+        //z position shifted to center
+        z = k * (sqrt(3.0) * radius)  - grid_z * sqrt(3.0) * radius / 2.0 + global_z;
+        // x, y, z contain coordinates for sphere position
+      }
+    }
+}
+
+void addHCPCube(
+  int grid_x,      //number of particles in x direction
+  int grid_y,      //number of particles in y direction
+  int grid_z,      //number of particles in z direction
+  double radius,   //radius of sphere
+  double global_x, //global offset in x
+  double global_y, //global offset in y
+  double global_z) //global offset in z
+{
+    double offset_x = 0, offset_z = 0, height = 0;
+    for (int j = 0; j < grid_y; j++) {
+      height = j * (sqrt(3.0) * radius);
+      //need to offset each alternate layer by radius in both x and z direction
+      offset_x = offset_z = (j % 2 != 0) ? radius : 0;
+      addHCPSheet(grid_x, grid_z, height + global_y, radius, offset_x+global_x, offset_z+global_z);
+    }
+}
+//***********************************
 void create_ice_particles(ChSystem& mphysicalSystem)
 {
 	ChSharedPtr<ChMaterialSurface> mmaterial(new ChMaterialSurface);
@@ -242,11 +337,11 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 
 	//*** create bed
 	ChSharedPtr<ChBodyEasyBox> earthPtr(new ChBodyEasyBox(
-											5.50,.04,5.50, // x,y,z size
+											110,1,110, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	earthPtr->SetPos(ChVector<>(0,-.40,0));
+	earthPtr->SetPos(ChVector<>(0,-10,0));
 	earthPtr->SetRot(ChQuaternion<>(1,0,0,0));
 	earthPtr->SetBodyFixed(true);
 	earthPtr->SetMaterialSurface(mmaterial);
@@ -254,19 +349,19 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mphysicalSystem.Add(earthPtr);
 
 	//*****
-	ChVector<> boxMin = ChVector<>(-.04, .09, -.12);
-	ChVector<> boxMax = ChVector<>(-.04 + .80, .05, -.12 + 1.10);
+	ChVector<> boxMin = ChVector<>(-.8, 0, -2.4);
+	ChVector<> boxMax = ChVector<>(-.8 + 16, 0, -2.4 + 21.2);
 	//**************** add walls
 	//*** side wall 1
-	double wall_width = .60;
-	double ship_height = .005;
+	double wall_width = 12;
+	double ship_height = .1;
 
 	ChSharedPtr<ChBodyEasyBox> wallPtr1(new ChBodyEasyBox(
-											ship_height,wall_width,1.5, // x,y,z size
+											ship_height,wall_width,30, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr1->SetPos(ChVector<>(boxMin.x - ship_height/2, 0, .50));
+	wallPtr1->SetPos(ChVector<>(boxMin.x - ship_height/2, 0, 10));
 	wallPtr1->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr1->SetBodyFixed(true);
 	wallPtr1->GetMaterialSurface()->SetFriction(0.4f);
@@ -278,11 +373,11 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	//*** side wall 2
 
 	ChSharedPtr<ChBodyEasyBox> wallPtr2(new ChBodyEasyBox(
-											ship_height,wall_width,1.5, // x,y,z size
+											ship_height,wall_width,30, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr2->SetPos(ChVector<>(boxMax.x + ship_height/2, 0, .50));
+	wallPtr2->SetPos(ChVector<>(boxMax.x + ship_height/2, 0, 10));
 	wallPtr2->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr2->SetBodyFixed(true);
 	wallPtr2->GetMaterialSurface()->SetFriction(0.4f);
@@ -335,53 +430,23 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mphysicalSystem.Add(wallPtr5);
 
 	//**************** sphere prob
-	double spacing = 2 * mradius*1.1;
-	int numColX = (boxMax.x - boxMin.x - spacing) / spacing;
-	int numColZ = (boxMax.z - boxMin.z - spacing) / spacing;
+	double spacing = 2 * mradius*1.05;
+	int numColX = (boxMax.x - boxMin.x) / spacing;
+	int numColZ = (boxMax.z - boxMin.z) / spacing;
 
 	double iceThickness = numLayers * mradius * 2;
 	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
-	printf("************************** buttomaslkdfjlkasdj %f\n", buttomLayerDY);
-	for (int j = 0; j < numLayers; j++) {
-		for (int i = 0; i < numColX; i++) {
-			for (int k = 0; k < numColZ; k++) {
-				// Create a ball that will collide with wall
-				double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-				double minert = (2./5.)* mmass * pow(mradius,2);
-				ChSharedPtr<ChBodyEasySphere> mrigidBody(new ChBodyEasySphere(
-														mradius,			// radius
-														rhoR,		// density
-														true,		// collide enable?
-														true));		// visualization?
-				ChVector<> pos = ChVector<>(
-						ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z)
-						+ ChVector<>((i+0.5) * spacing, j * spacing, (k+0.5) * spacing)
-						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
-						);
-				mrigidBody->SetPos(pos);
 
-				// set moment of inertia (more realistic than default 1,1,1).
-				mrigidBody->SetInertiaXX(ChVector<>(minert,minert,minert));
-				mrigidBody->SetPos_dt(ChVector<>(0,0,0));
-				mrigidBody->GetMaterialSurface()->SetFriction(0.4f);
-				mrigidBody->GetMaterialSurface()->SetCompliance(0.0);
-				mrigidBody->GetMaterialSurface()->SetComplianceT(0.0);
-				mrigidBody->GetMaterialSurface()->SetDampingF(0.2);
-				mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
-				mphysicalSystem.Add(mrigidBody);
-
-				create_hydronynamic_force(mrigidBody.get_ptr(), mphysicalSystem, surfaceLoc, true);
-
-				// optional, attach a texture for better visualization
-				ChSharedPtr<ChTexture> mtextureball(new ChTexture());
-				mtextureball->SetTextureFilename(GetChronoDataFile("../data/bluwhite.png"));
-				mrigidBody->AddAsset(mtextureball);
-			}
-		}
-
-	}
-
-
+	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
+	double minert = (2./5.)* mmass * pow(mradius,2);
+	printf("************************** Generate Ice, ButtomLayer_Y %f, groundY %f\n", buttomLayerDY, earthPtr->GetPos().y);
+	double global_x = boxMin.x;
+	double global_y = surfaceLoc.y - buttomLayerDY;
+	double global_z = boxMin.z;
+	GenerateIceLayers_Rectangular(mphysicalSystem,
+			numColX, numLayers, numColZ,
+			global_x, global_y, global_z,
+			spacing, mmass,	minert);
 	//*** create ship
 	double boxMass = rhoR * box_X * box_Y * box_Z;
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
@@ -394,7 +459,7 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	shipInitialPos = ChVector<>(.5 * (boxMax.x + boxMin.x),  .04, shipInitialPosZ);
+	shipInitialPos = ChVector<>(.5 * (boxMax.x + boxMin.x),  1, shipInitialPosZ);
 	shipPtr->SetPos(shipInitialPos);
 	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
 //	wallPtr1->SetBodyFixed(false);
@@ -489,7 +554,10 @@ int main(int argc, char* argv[])
 #define irrlichtVisualization true
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
-	double dT = 0.005;
+
+	double dT = 0.1* mradius / shipVelocity; //moving 0.1*R at each time step
+	printf("****************************************************************************\n");
+	printf("dT: %f, shipVelocity: %f, particles_radius: %f, timePause: %f, timeMove: %f\n\n", dT, shipVelocity, mradius, timePause, timeMove);
 
 	fstream outForceData("forceData.txt", ios::out);
 
@@ -503,8 +571,8 @@ int main(int argc, char* argv[])
 		// Easy shortcuts to add camera, lights, logo and sky in Irrlicht scene:
 		ChIrrWizard::add_typical_Logo  (application.GetDevice());
 		ChIrrWizard::add_typical_Sky   (application.GetDevice());
-		ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(.7f, 2.2f, -.9f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
-		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.15,.4,-.40), core::vector3df(0,.05,0));
+		ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(14.0f, 44.0f, -18.0f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
+		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-3,12,-8), core::vector3df(0,1,0));
 		// Use this function for adding a ChIrrNodeAsset to all items
 		// If you need a finer control on which item really needs a visualization proxy in
 		// Irrlicht, just use application.AssetBind(myitem); on a per-item basis.
@@ -532,14 +600,14 @@ int main(int argc, char* argv[])
 	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 
-	while(mphysicalSystem.GetChTime() < 3.8) //arman modify
+	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
 		myTimer.start();
 #if irrlichtVisualization
 		if ( !(application.GetDevice()->run()) ) break;
 		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
-		ChIrrTools::drawGrid(application.GetVideoDriver(), .05,.05, 40,40,
-			ChCoordsys<>(ChVector<>(0,-.30,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
+		ChIrrTools::drawGrid(application.GetVideoDriver(), 1,1, 40,40,
+			ChCoordsys<>(ChVector<>(0,-2,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
 		application.DrawAll();
 		application.DoStep();
 		application.GetVideoDriver()->endScene();
