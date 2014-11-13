@@ -258,10 +258,11 @@ void GenerateIceLayers_Rectangular(
 		double global_x, //global offset in x
 		double global_y, //global offset in y
 		double global_z,
-		double spacing,
+		double expandR,
 		double mmass,
 		double minert) //global offset in z
 {
+	double spacing = 2 * expandR;
 	for (int j = 0; j < numLayers; j++) {
 		for (int i = 0; i < numColX; i++) {
 			for (int k = 0; k < numColZ; k++) {
@@ -284,43 +285,61 @@ void GenerateIceLayers_Rectangular(
 }
 //***********************************
 void addHCPSheet(
-  int grid_x,       //number of particles in x direction
-  int grid_z,       //number of particles in z direction
-  double height,    //height of layer
-  double radius,    //radius of spheres
-  double global_x,  //global offset of sheet in x
-  double global_z)  //global offset of sheet in z
+		ChSystem& mphysicalSystem,
+		int grid_x,       //number of particles in x direction
+		int grid_z,       //number of particles in z direction
+		double height,    //height of layer
+		double global_x,  //global offset of sheet in x
+		double global_z,
+		double expandR,
+		double mmass,
+		double minert)  //global offset of sheet in z
 {
     double offset = 0;
     double x = 0, y = height, z = 0;
     for (int i = 0; i < grid_x; i++) {
       for (int k = 0; k < grid_z; k++) {
         //need to offset alternate rows by radius
-        offset = (k % 2 != 0) ? radius : 0;
+        offset = (k % 2 != 0) ? expandR : 0;
         //x position, shifted to center
-        x = i * 2 * radius + offset  - grid_x * 2 * radius / 2.0 + global_x;
+        x = i * 2 * expandR + offset  - grid_x * 2 * expandR / 2.0 + global_x;
         //z position shifted to center
-        z = k * (sqrt(3.0) * radius)  - grid_z * sqrt(3.0) * radius / 2.0 + global_z;
+        z = k * (sqrt(3.0) * expandR)  - grid_z * sqrt(3.0) * expandR / 2.0 + global_z;
         // x, y, z contain coordinates for sphere position
+
+
+
+
+
+		ChSharedPtr<ChBodyEasySphere> mrigidBody(new ChBodyEasySphere(
+												mradius,			// radius
+												rhoR,		// density
+												true,		// collide enable?
+												true));		// visualization?
+		ChVector<> pos = ChVector<>(x, height, z);
+		CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
       }
     }
 }
 
-void addHCPCube(
-  int grid_x,      //number of particles in x direction
-  int grid_y,      //number of particles in y direction
-  int grid_z,      //number of particles in z direction
-  double radius,   //radius of sphere
-  double global_x, //global offset in x
-  double global_y, //global offset in y
-  double global_z) //global offset in z
+void GenerateIceLayers_Hexagonal(
+		ChSystem& mphysicalSystem,
+		int grid_x,      //number of particles in x direction
+		int grid_y,      //number of particles in y direction
+		int grid_z,      //number of particles in z direction
+		double global_x, //global offset in x
+		double global_y, //global offset in y
+		double global_z,
+		double expandR,
+		double mmass,
+		double minert) //global offset in z
 {
     double offset_x = 0, offset_z = 0, height = 0;
     for (int j = 0; j < grid_y; j++) {
-      height = j * (sqrt(3.0) * radius);
+      height = j * (sqrt(3.0) * expandR);
       //need to offset each alternate layer by radius in both x and z direction
-      offset_x = offset_z = (j % 2 != 0) ? radius : 0;
-      addHCPSheet(grid_x, grid_z, height + global_y, radius, offset_x+global_x, offset_z+global_z);
+      offset_x = offset_z = (j % 2 != 0) ? expandR : 0;
+      addHCPSheet(mphysicalSystem, grid_x, grid_z, height + global_y, offset_x+global_x, offset_z+global_z, expandR, mmass, minert);
     }
 }
 //***********************************
@@ -430,9 +449,9 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mphysicalSystem.Add(wallPtr5);
 
 	//**************** sphere prob
-	double spacing = 2 * mradius*1.05;
-	int numColX = (boxMax.x - boxMin.x) / spacing;
-	int numColZ = (boxMax.z - boxMin.z) / spacing;
+	double expandR = mradius*1.05;
+	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
+	int numColZ = (boxMax.z - boxMin.z - expandR) / (2 * expandR);
 
 	double iceThickness = numLayers * mradius * 2;
 	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
@@ -443,10 +462,14 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	double global_x = boxMin.x;
 	double global_y = surfaceLoc.y - buttomLayerDY;
 	double global_z = boxMin.z;
-	GenerateIceLayers_Rectangular(mphysicalSystem,
+//	GenerateIceLayers_Rectangular(mphysicalSystem,
+//			numColX, numLayers, numColZ,
+//			global_x, global_y, global_z,
+//			expandR, mmass,	minert);
+	GenerateIceLayers_Hexagonal(mphysicalSystem,
 			numColX, numLayers, numColZ,
 			global_x, global_y, global_z,
-			spacing, mmass,	minert);
+			expandR, mmass,	minert);
 	//*** create ship
 	double boxMass = rhoR * box_X * box_Y * box_Z;
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
