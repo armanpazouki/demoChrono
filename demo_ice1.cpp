@@ -37,18 +37,18 @@
 //#include "unit_IRRLICHT/ChIrrAppInterface.h"
 #include "lcp/ChLcpIterativeMINRES.h" // test
 #include "physics/ChSystem.h"
-#include "physics/ChMaterialSurface.h"
-#include "physics/ChController.h"
+//#include "physics/ChMaterialSurface.h"
+//#include "physics/ChController.h"
 #include "physics/ChBodyEasy.h"
 #include "physics/ChContactContainer.h"
 #include "collision/ChCModelBulletBody.h"
-#include "core/ChTimer.h"
-#include "core/ChRealtimeStep.h"
-#include "assets/ChTexture.h"
+//#include "core/ChTimer.h"
+//#include "core/ChRealtimeStep.h"
+//#include "assets/ChTexture.h"
 #include "unit_IRRLICHT/ChIrrApp.h"
 #include <cstring>
 #include <fstream>
-#include <map>
+//#include <map>
 
  
 // Use the namespace of Chrono
@@ -73,7 +73,7 @@ const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 //******************* ship and sphere stuff
 double mradius = .4;
-int numLayers = 1;
+int numLayers = 2;
 
 //ChBodySceneNode* shipPtr;
 ChSharedPtr<ChBodyEasyBox> shipPtr;
@@ -252,9 +252,8 @@ void CreateSphere(ChSystem& mphysicalSystem, ChSharedPtr<ChBodyEasySphere> mrigi
 //***********************************
 void GenerateIceLayers_Rectangular(
 		ChSystem& mphysicalSystem,
-		int numColX,     //number of particles in x direction
-		int numLayers,   //number of particles in y direction
-		int numColZ,     //number of particles in z direction
+		ChVector<> boxMin,
+		ChVector<> boxMax,
 		double global_x, //global offset in x
 		double global_y, //global offset in y
 		double global_z,
@@ -262,6 +261,8 @@ void GenerateIceLayers_Rectangular(
 		double mmass,
 		double minert) //global offset in z
 {
+	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
+	int numColZ = (boxMax.z - boxMin.z - expandR) / (2 * expandR);
 	double spacing = 2 * expandR;
 	for (int j = 0; j < numLayers; j++) {
 		for (int i = 0; i < numColX; i++) {
@@ -302,9 +303,9 @@ void addHCPSheet(
         //need to offset alternate rows by radius
         offset = (k % 2 != 0) ? expandR : 0;
         //x position, shifted to center
-        x = i * 2 * expandR + offset  - grid_x * 2 * expandR / 2.0 + global_x;
+        x = i * 2 * expandR + offset + expandR + global_x;
         //z position shifted to center
-        z = k * (sqrt(3.0) * expandR)  - grid_z * sqrt(3.0) * expandR / 2.0 + global_z;
+        z = k * (sqrt(3.0) * expandR)  + expandR + global_z;
         // x, y, z contain coordinates for sphere position
 
 
@@ -321,12 +322,11 @@ void addHCPSheet(
       }
     }
 }
-
+//***********************************
 void GenerateIceLayers_Hexagonal(
 		ChSystem& mphysicalSystem,
-		int grid_x,      //number of particles in x direction
-		int grid_y,      //number of particles in y direction
-		int grid_z,      //number of particles in z direction
+		ChVector<> boxMin,
+		ChVector<> boxMax,
 		double global_x, //global offset in x
 		double global_y, //global offset in y
 		double global_z,
@@ -334,12 +334,14 @@ void GenerateIceLayers_Hexagonal(
 		double mmass,
 		double minert) //global offset in z
 {
+	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
+	int numColZ = (boxMax.z - boxMin.z - expandR) / (sqrt(3.0) * expandR);
     double offset_x = 0, offset_z = 0, height = 0;
-    for (int j = 0; j < grid_y; j++) {
+    for (int j = 0; j < numLayers; j++) {
       height = j * (sqrt(3.0) * expandR);
       //need to offset each alternate layer by radius in both x and z direction
       offset_x = offset_z = (j % 2 != 0) ? expandR : 0;
-      addHCPSheet(mphysicalSystem, grid_x, grid_z, height + global_y, offset_x+global_x, offset_z+global_z, expandR, mmass, minert);
+      addHCPSheet(mphysicalSystem, numColX, numColZ, height + global_y, offset_x+global_x, offset_z+global_z, expandR, mmass, minert);
     }
 }
 //***********************************
@@ -354,33 +356,25 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 		//mmaterial->SetDampingF(0.2);
 		//mmaterial->SetCohesion(0.05);
 
-	//*** create bed
-	ChSharedPtr<ChBodyEasyBox> earthPtr(new ChBodyEasyBox(
-											110,1,110, // x,y,z size
-											rhoR,		// density
-											true,		// collide enable?
-											true));		// visualization?
-	earthPtr->SetPos(ChVector<>(0,-10,0));
-	earthPtr->SetRot(ChQuaternion<>(1,0,0,0));
-	earthPtr->SetBodyFixed(true);
-	earthPtr->SetMaterialSurface(mmaterial);
-	earthPtr->SetCollide(false);
-	mphysicalSystem.Add(earthPtr);
-
 	//*****
 	ChVector<> boxMin = ChVector<>(-.8, 0, -2.4);
-	ChVector<> boxMax = ChVector<>(-.8 + 16, 0, -2.4 + 21.2);
-	//**************** add walls
+	ChVector<> hdim = ChVector<>(16, 12, 21.2);
+	ChVector<> center = 0.5 * hdim + boxMin;
+	ChVector<> boxMax = boxMin + hdim;
+	//**************** add walls and bed
+	ChVector<> tankLoc = ChVector<>(center.x, center.y - 0.5 * hdim.y, center.z);
 	//*** side wall 1
-	double wall_width = 12;
-	double ship_height = .1;
+	double hthick = .1;
+	double hole_width = 1.2 * ship_width;
+	double small_wall_Length = 0.5 * (hdim.x - hole_width);
+
 
 	ChSharedPtr<ChBodyEasyBox> wallPtr1(new ChBodyEasyBox(
-											ship_height,wall_width,30, // x,y,z size
+											hthick, hdim.y, hdim.z,
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr1->SetPos(ChVector<>(boxMin.x - ship_height/2, 0, 10));
+	wallPtr1->SetPos(tankLoc + ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));
 	wallPtr1->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr1->SetBodyFixed(true);
 	wallPtr1->GetMaterialSurface()->SetFriction(0.4f);
@@ -392,11 +386,11 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	//*** side wall 2
 
 	ChSharedPtr<ChBodyEasyBox> wallPtr2(new ChBodyEasyBox(
-											ship_height,wall_width,30, // x,y,z size
+											hthick, hdim.y, hdim.z, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr2->SetPos(ChVector<>(boxMax.x + ship_height/2, 0, 10));
+	wallPtr2->SetPos(tankLoc + ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));
 	wallPtr2->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr2->SetBodyFixed(true);
 	wallPtr2->GetMaterialSurface()->SetFriction(0.4f);
@@ -407,11 +401,11 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	//*** end wall
 
 	ChSharedPtr<ChBodyEasyBox> wallPtr3(new ChBodyEasyBox(
-											boxMax.x - boxMin.x, wall_width, ship_height, // x,y,z size
+											hdim.x, hdim.y, hthick, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr3->SetPos(ChVector<>((boxMin.x + boxMax.x)/2, 0, boxMax.z));
+	wallPtr3->SetPos(tankLoc + ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));
 	wallPtr3->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr3->SetBodyFixed(true);
 	wallPtr3->GetMaterialSurface()->SetFriction(0.4f);
@@ -420,14 +414,12 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mphysicalSystem.Add(wallPtr3);
 
 	//*** beginning walls
-	double hole_width = 1.2 * ship_width;
-	double small_wall_Length = 0.5 * (boxMax.x - boxMin.x - hole_width);
 	ChSharedPtr<ChBodyEasyBox> wallPtr4(new ChBodyEasyBox(
-											small_wall_Length, wall_width, ship_height, // x,y,z size
+											small_wall_Length, hdim.y, hthick, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr4->SetPos(ChVector<>(boxMin.x + .5 * small_wall_Length, 0, boxMin.z - ship_height/2));
+	wallPtr4->SetPos(tankLoc + ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick));
 	wallPtr4->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr4->SetBodyFixed(true);
 	wallPtr4->GetMaterialSurface()->SetFriction(0.4f);
@@ -436,11 +428,11 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	mphysicalSystem.Add(wallPtr4);
 
 	ChSharedPtr<ChBodyEasyBox> wallPtr5(new ChBodyEasyBox(
-											small_wall_Length, wall_width, ship_height, // x,y,z size
+											small_wall_Length, hdim.y, hthick, // x,y,z size
 											rhoR,		// density
 											true,		// collide enable?
 											true));		// visualization?
-	wallPtr5->SetPos(ChVector<>(boxMax.x - .5 * small_wall_Length, 0, boxMin.z - ship_height/2));
+	wallPtr5->SetPos(tankLoc + ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick));
 	wallPtr5->SetRot(ChQuaternion<>(1,0,0,0));
 	wallPtr5->SetBodyFixed(true);
 	wallPtr5->GetMaterialSurface()->SetFriction(0.4f);
@@ -448,26 +440,37 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	wallPtr5->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
 	mphysicalSystem.Add(wallPtr5);
 
+	//*** bottom bed
+	ChSharedPtr<ChBodyEasyBox> earthPtr(new ChBodyEasyBox(
+											7 * hdim.x, hthick, 7 * hdim.x, // x,y,z size
+											rhoR,		// density
+											true,		// collide enable?
+											true));		// visualization?
+	earthPtr->SetPos(tankLoc + ChVector<>(0,-10,0));
+	earthPtr->SetRot(ChQuaternion<>(1,0,0,0));
+	earthPtr->SetBodyFixed(true);
+	earthPtr->SetMaterialSurface(mmaterial);
+	earthPtr->SetCollide(false);
+	mphysicalSystem.Add(earthPtr);
+
 	//**************** sphere prob
 	double expandR = mradius*1.05;
-	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
-	int numColZ = (boxMax.z - boxMin.z - expandR) / (2 * expandR);
 
 	double iceThickness = numLayers * mradius * 2;
 	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
 
 	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
 	double minert = (2./5.)* mmass * pow(mradius,2);
-	printf("************************** Generate Ice, ButtomLayer_Y %f, groundY %f\n", buttomLayerDY, earthPtr->GetPos().y);
+	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
 	double global_x = boxMin.x;
 	double global_y = surfaceLoc.y - buttomLayerDY;
 	double global_z = boxMin.z;
 //	GenerateIceLayers_Rectangular(mphysicalSystem,
-//			numColX, numLayers, numColZ,
+//			boxMin, boxMax,
 //			global_x, global_y, global_z,
 //			expandR, mmass,	minert);
 	GenerateIceLayers_Hexagonal(mphysicalSystem,
-			numColX, numLayers, numColZ,
+			boxMin, boxMax,
 			global_x, global_y, global_z,
 			expandR, mmass,	minert);
 	//*** create ship
@@ -501,21 +504,6 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 	shipPtr->AddAsset(mtexturebox);
 	//**** end ship initialization
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	char forceTag[] = "pulling_force";
 	ChSharedPtr<ChForce> pullingForce = ChSharedPtr<ChForce>(new ChForce);
 	pullingForce->SetMode(FTYPE_FORCE); // no need for this. It is the default option.
@@ -528,11 +516,11 @@ void create_ice_particles(ChSystem& mphysicalSystem)
 
 	//***** prismatic constraint between ship and bed
 //	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
-//	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
+//	shipConstraint->Initialize(shipPtr->GetBody(), wallPtr3->GetBody(),
 //			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
 //			);
 	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
-	shipConstraint->Initialize(shipPtr, earthPtr,
+	shipConstraint->Initialize(shipPtr, wallPtr3,
 			ChCoordsys<>(ChVector<>(.30,  .09, -.25) , QUNIT)
 			);
 	mphysicalSystem.AddLink(shipConstraint);
@@ -618,11 +606,12 @@ int main(int argc, char* argv[])
 	//mphysicalSystem.SetParallelThreadNumber(2);
 
 	mphysicalSystem.SetTol(0);
-	mphysicalSystem.SetTolSpeeds(0);
+//	mphysicalSystem.SetTolSpeeds(0);
 
 	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 
+	printf("***** number of bodies %d\n", mphysicalSystem.Get_bodylist()->size());
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
 		myTimer.start();
