@@ -48,6 +48,7 @@
 #include "unit_IRRLICHT/ChIrrApp.h"
 #include <cstring>
 #include <fstream>
+#include <sstream>
 //#include <map>
 
  
@@ -562,7 +563,7 @@ int main(int argc, char* argv[])
 	// global functions are needed.
 //	DLL_CreateGlobals();
 
-#define irrlichtVisualization true
+#define irrlichtVisualization false
 	// Create a ChronoENGINE physical system
 	ChSystem mphysicalSystem; 
 
@@ -570,7 +571,7 @@ int main(int argc, char* argv[])
 	printf("****************************************************************************\n");
 	printf("dT: %f, shipVelocity: %f, particles_radius: %f, timePause: %f, timeMove: %f\n\n", dT, shipVelocity, mradius, timePause, timeMove);
 
-	fstream outForceData("forceData.txt", ios::out);
+	ofstream outForceData("forceData.txt");
 
 	// Create all the rigid bodies.
 	create_ice_particles(mphysicalSystem);
@@ -597,10 +598,10 @@ int main(int argc, char* argv[])
 #endif
 
 	// Prepare the physical system for the simulation 
-	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_SOR);
+	mphysicalSystem.SetLcpSolverType(ChSystem::LCP_ITERATIVE_APGD);
 	mphysicalSystem.SetUseSleeping(false);
 	mphysicalSystem.SetMaxPenetrationRecoverySpeed(2 * shipVelocity); // used by Anitescu stepper only
-	mphysicalSystem.SetIterLCPmaxItersSpeed(500);
+	mphysicalSystem.SetIterLCPmaxItersSpeed(5000);
 	//mphysicalSystem.SetIterLCPmaxItersStab(20); // unuseful for Anitescu, only Tasora uses this
 	//mphysicalSystem.SetIterLCPwarmStarting(true);
 	//mphysicalSystem.SetParallelThreadNumber(2);
@@ -610,6 +611,8 @@ int main(int argc, char* argv[])
 
 	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
+
+	outForceData.close();
 
 	printf("***** number of bodies %d\n", mphysicalSystem.Get_bodylist()->size());
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
@@ -655,12 +658,16 @@ int main(int argc, char* argv[])
 			ibody++;
 		}
 //		printf("time %f, force %f %f %f, shipVelocity %f, simulation time %f, energy %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, shipPtr->GetBody()->GetPos_dt().z, myTimer(), energy);
-		outForceData << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
+		stringstream outDataSS;
+		outDataSS << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
 				mForce.Length() << ", " <<
 				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
 				shipPtr->GetPos_dt().z << ", " << shipPtr->GetPos().z << ", " << energy << ", " << myTimer() << endl;
+		ofstream outData("forceData.txt", ios::app);
+		outData<<outDataSS.str();
+		outData.close();
 
-		printf("Time %f, energy %f, time per step %f\n", mphysicalSystem.GetChTime(), energy, myTimer());
+		printf("Time %f, energy %f, time per step %f, forceMagnitude %f\n", mphysicalSystem.GetChTime(), energy, myTimer(), mForce.Length());
 	}
 	outForceData.close();
 	return 0;
