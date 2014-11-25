@@ -201,6 +201,8 @@ void calc_ship_contact_forces(ChSystem& mphysicalSystem, ChVector<> & mForce, Ch
 //	ChVector<> mTorque;
 
 	std::list<ChContact*> m_list = container->GetContactList();
+	printf("num contacts %d %d\n", m_list.size(), container->GetNcontacts());
+
 	for (std::list<ChContact *>::iterator it=m_list.begin(); it != m_list.end(); ++it){
 	  ChVector<> force_contactFrame = (*it)->GetContactForce();
 	  ChVector<> force_abs = *((*it)->GetContactPlane()) * force_contactFrame;
@@ -668,6 +670,10 @@ int main(int argc, char* argv[])
 		outData.close();
 
 		printf("Time %f, energy %f, time per step %f, forceMagnitude %f\n", mphysicalSystem.GetChTime(), energy, myTimer(), mForce.Length());
+		fflush(stdout);
+		cout << "check" << endl;
+
+
 	}
 	outForceData.close();
 	return 0;
